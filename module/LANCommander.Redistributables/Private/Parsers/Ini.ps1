@@ -9,10 +9,15 @@
     Section headers become group nodes; keys outside any section land at the root.
 
     ChoiceCommentPattern lets a redistributable harvest valid values out of the
-    comments that sit above a key -- a very common convention (dgVoodoo.conf
-    documents its allowed values this way). The pattern must expose a named group
-    'choices'; the captured text is split on commas or pipes. This keeps odd
-    conventions declarative instead of requiring a bespoke parser.
+    comments that sit directly above a key -- a very common convention. The pattern
+    must expose a named group 'choices'; the captured text is split on commas or
+    pipes. This keeps odd conventions declarative instead of requiring a bespoke
+    parser.
+
+    It only reaches comments that survive the blank-line rule below, so it cannot
+    read a config that documents a whole section in one block above a blank line.
+    dgVoodoo.conf is the notable example, and it uses ConfigFormat 'custom' with a
+    repository-local Parse-Config.ps1 instead.
 #>
 function ConvertFrom-IniConfig {
     [CmdletBinding()]

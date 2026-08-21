@@ -96,7 +96,10 @@ jobs:
         run: |
           Import-Module ./.hub/module/LANCommander.Redistributables -Force
 
-          $payload = Resolve-RedistributablePayload -RepositoryPath . -StagingPath ./.payload
+          # -RefreshReference is a no-op unless Source.Mode is 'none', where it
+          # lets source.ps1 refresh the committed Reference/ config the schema is
+          # generated from. It never yields a payload.
+          $payload = Resolve-RedistributablePayload -RepositoryPath . -StagingPath ./.payload -RefreshReference
           $schema = Update-OptionSchemaFile -RepositoryPath . -PayloadPath $payload.PayloadPath
 
           # LastKnownVersion is what the next run compares against, so it has to
@@ -143,6 +146,7 @@ jobs:
             OptionSchema.yml
             redistributable.yml
             Files/**
+            Reference/**
           body: |
             Upstream moved from `${{ steps.upstream.outputs.previous }}` to
             `${{ steps.upstream.outputs.version }}`.

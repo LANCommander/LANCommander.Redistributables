@@ -16,6 +16,7 @@ on:
       - 'OptionSchema.yml'
       - 'Scripts/**'
       - 'Files/**'
+      - 'Reference/**'
       - 'source.ps1'
       - 'Parse-Config.ps1'
   pull_request:
@@ -25,6 +26,7 @@ on:
       - 'OptionSchema.yml'
       - 'Scripts/**'
       - 'Files/**'
+      - 'Reference/**'
       - 'source.ps1'
       - 'Parse-Config.ps1'
   workflow_dispatch:
