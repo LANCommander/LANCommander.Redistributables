@@ -25,12 +25,22 @@
             Type: choice
             Choices: [unforced, max]
             PinDefault: true        # freeze Default at its previously committed value
+          GAMEID:                   # an entry declaring a Type is authored outright,
+            Type: string            # even when nothing generated it
+            IsEnvironmentVariable: true
 
         Exclude: [Debug.*]          # drop entirely, glob-matched
 
     Anything the overlay does not mention passes through untouched, so a newly
     added upstream option ships uncurated rather than being dropped. Those are
     surfaced in the report so a human can describe them later.
+
+    An overlay entry whose path the generated schema does not contain is either an
+    option authored from scratch or a typo, and the Type is what tells the two
+    apart. With a Type it becomes an option and is listed under Authored; without
+    one it is listed under StaleCuration and dropped, as before. That is what lets
+    a shim with no config file at all -- umu-launcher, which is configured purely
+    through environment variables -- own its entire schema from the overlay.
 
     Two different path spaces are in play and the distinction matters. Curation,
     exclusion and grouping are keyed by the GENERATED path, which is where the
@@ -73,6 +83,7 @@ function Merge-SchemaOverlay {
         DefaultChanged = [System.Collections.Generic.List[string]]::new()
         Excluded       = [System.Collections.Generic.List[string]]::new()
         Uncurated      = [System.Collections.Generic.List[string]]::new()
+        Authored       = [System.Collections.Generic.List[string]]::new()
         StaleCuration  = [System.Collections.Generic.List[string]]::new()
     }
 
@@ -86,6 +97,43 @@ function Merge-SchemaOverlay {
         }
 
         $included[$path] = $generated[$path]
+    }
+
+    # --- Materialise options the overlay authors outright --------------------
+    # An overlay entry that declares a Type is not curation of a generated option,
+    # it IS the option. That is the whole schema for a shim with no config file to
+    # parse: umu-launcher configures itself through environment variables alone,
+    # so every one of its options is hand-written in the overlay.
+    #
+    # An entry WITHOUT a Type is still curation, and is still reported as stale
+    # when nothing matches it, so a mistyped path is caught rather than quietly
+    # becoming an orphaned option nobody asked for.
+    #
+    # Authored paths are appended after the generated ones, in overlay order, so
+    # the emitted document stays byte-identical between runs.
+    foreach ($path in $curation.Keys) {
+        if ($generated.Contains($path)) { continue }
+
+        $authored = $curation[$path]
+
+        $declaresType = $authored -is [System.Collections.IDictionary] -and
+            $authored.Contains('Type') -and
+            -not [string]::IsNullOrWhiteSpace([string] $authored['Type'])
+
+        if (-not $declaresType) {
+            $report.StaleCuration.Add($path)
+            continue
+        }
+
+        if (Test-PathAgainstGlob -Path $path -Globs $exclude) {
+            $report.Excluded.Add($path)
+            continue
+        }
+
+        # Seeded empty: the curation loop below layers the overlay over it, which
+        # is the same code path a generated option takes.
+        $included[$path] = [ordered] @{}
+        $report.Authored.Add($path)
     }
 
     # --- Work out where each option will end up before curating it -----------
@@ -130,10 +178,6 @@ function Merge-SchemaOverlay {
         }
 
         $curated[$path] = Format-OptionLeaf -Leaf $leaf
-    }
-
-    foreach ($path in $curation.Keys) {
-        if (-not $generated.Contains($path)) { $report.StaleCuration.Add($path) }
     }
 
     # --- Assemble the result --------------------------------------------------

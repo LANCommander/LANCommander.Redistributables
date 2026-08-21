@@ -21,6 +21,7 @@ function Export-OptionSchemaFile {
         Removed        = 'Options removed upstream'
         DefaultChanged = 'Defaults changed upstream'
         Excluded       = 'Options excluded by the overlay'
+        Authored       = 'Options authored by the overlay'
         StaleCuration  = 'Overlay entries with no matching option (stale curation)'
     }
 

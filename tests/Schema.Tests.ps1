@@ -159,10 +159,119 @@ Options:
     }
 
     It 'reports overlay entries that no longer match anything as stale' {
+        # No Type, so this is curation of an option that vanished, not an option.
         $overlay = ConvertFrom-Yaml -Ordered -Yaml "Options:`n  General.LongGone:`n    Description: x`n"
         $result = Merge-SchemaOverlay -Schema (Get-TestSchema) -Overlay $overlay
 
         $result.Report.StaleCuration | Should -Contain 'General.LongGone'
+        $result.Report.Authored | Should -BeNullOrEmpty
+        $result.Schema.Options['General']['Options'].Contains('LongGone') | Should -BeFalse
+    }
+
+    It 'materialises an overlay option that declares a Type' {
+        $overlay = ConvertFrom-Yaml -Ordered -Yaml @'
+Options:
+  General.PROTONPATH:
+    Type: string
+    DisplayName: Proton Build
+    IsEnvironmentVariable: true
+'@
+        $result = Merge-SchemaOverlay -Schema (Get-TestSchema) -Overlay $overlay
+        $option = $result.Schema.Options['General']['Options']['PROTONPATH']
+
+        $option['Type'] | Should -Be 'string'
+        $option['DisplayName'] | Should -Be 'Proton Build'
+        $option['IsEnvironmentVariable'] | Should -BeTrue
+
+        # Authored, not curation of something generated and not left uncurated.
+        $result.Report.Authored | Should -Contain 'General.PROTONPATH'
+        $result.Report.StaleCuration | Should -Not -Contain 'General.PROTONPATH'
+        $result.Report.Uncurated | Should -Not -Contain 'General.PROTONPATH'
+    }
+
+    It 'builds an option tree from an overlay alone when no config was parsed' {
+        # A shim with no config file at all: umu-launcher is configured purely
+        # through environment variables, so the overlay is the entire schema.
+        $overlay = ConvertFrom-Yaml -Ordered -Yaml @'
+CommandTemplate: umu-run {exe} {args}
+GuestPlatforms: Windows
+Groups:
+  Proton:
+    Description: Which Proton build runs the game
+    Include: [PROTONPATH, PROTON_VERB]
+Options:
+  PROTONPATH:
+    Type: string
+    IsEnvironmentVariable: true
+  PROTON_VERB:
+    Type: choice
+    Default: waitforexitandrun
+    Choices: [waitforexitandrun, run]
+    IsEnvironmentVariable: true
+'@
+        $result = Merge-SchemaOverlay -Schema ([ordered] @{ Options = [ordered] @{} }) -Overlay $overlay
+
+        $result.Report.Authored.Count | Should -Be 2
+        $result.Schema.Options['Proton']['Options']['PROTON_VERB']['Default'] | Should -Be 'waitforexitandrun'
+        (Test-OptionSchema -Schema $result.Schema).IsValid | Should -BeTrue
+    }
+
+    It 'keeps a group whose only members are overlay-authored' {
+        # Build-CuratedTree omits a group that matched nothing, which would drop
+        # every group in an overlay-only schema.
+        $overlay = ConvertFrom-Yaml -Ordered -Yaml @'
+Groups:
+  Proton:
+    Description: Which Proton build runs the game
+    Include: [PROTONPATH]
+Options:
+  PROTONPATH:
+    Type: string
+    IsEnvironmentVariable: true
+'@
+        $result = Merge-SchemaOverlay -Schema ([ordered] @{ Options = [ordered] @{} }) -Overlay $overlay -WarningVariable warnings -WarningAction SilentlyContinue
+
+        $warnings | Should -BeNullOrEmpty
+        $result.Schema.Options['Proton']['Description'] | Should -Be 'Which Proton build runs the game'
+    }
+
+    It 'produces a byte-identical document for an overlay-only schema' {
+        $overlay = ConvertFrom-Yaml -Ordered -Yaml @'
+Options:
+  GAMEID:
+    Type: string
+    Default: umu-default
+    IsEnvironmentVariable: true
+  UMU_LOG:
+    Type: choice
+    Default: "0"
+    Choices: ["0", "1", debug]
+    IsEnvironmentVariable: true
+'@
+        $empty = [ordered] @{ Options = [ordered] @{} }
+
+        $first = Merge-SchemaOverlay -Schema $empty -Overlay $overlay
+        $second = Merge-SchemaOverlay -Schema $empty -Overlay $overlay -PreviousSchema $first.Schema
+
+        (ConvertTo-Yaml $second.Schema) | Should -BeExactly (ConvertTo-Yaml $first.Schema)
+        $second.Report.Added | Should -BeNullOrEmpty
+        $second.Report.DefaultChanged | Should -BeNullOrEmpty
+    }
+
+    It 'honours an Exclude glob against an authored option' {
+        $overlay = ConvertFrom-Yaml -Ordered -Yaml @'
+Options:
+  UMU_NO_PROTON:
+    Type: string
+    IsEnvironmentVariable: true
+Exclude:
+  - UMU_*
+'@
+        $result = Merge-SchemaOverlay -Schema ([ordered] @{ Options = [ordered] @{} }) -Overlay $overlay
+
+        $result.Report.Excluded | Should -Contain 'UMU_NO_PROTON'
+        $result.Report.Authored | Should -Not -Contain 'UMU_NO_PROTON'
+        $result.Schema.Options.Contains('UMU_NO_PROTON') | Should -BeFalse
     }
 
     It 'carries root shim properties through from the overlay' {
@@ -230,6 +339,28 @@ Options:
 
         $result.IsValid | Should -BeFalse
         $result.Errors -join ' ' | Should -Match 'IsEnvironmentVariable'
+    }
+
+    It 'rejects two environment-variable options that share a leaf key' {
+        # ProcessExecutionContext names the variable after the last dot-segment,
+        # so these would both resolve to PROTONPATH and one would silently win.
+        $schema = ConvertFrom-Yaml -Ordered -Yaml @'
+Options:
+  Proton:
+    Options:
+      PROTONPATH:
+        Type: string
+        IsEnvironmentVariable: true
+  Advanced:
+    Options:
+      PROTONPATH:
+        Type: string
+        IsEnvironmentVariable: true
+'@
+        $result = Test-OptionSchema -Schema $schema
+
+        $result.IsValid | Should -BeFalse
+        $result.Errors -join ' ' | Should -Match 'PROTONPATH'
     }
 
     It 'rejects an unquoted boolean default' {

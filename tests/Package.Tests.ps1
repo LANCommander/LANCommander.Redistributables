@@ -345,6 +345,49 @@ Describe 'Update-OptionSchemaFile' {
         Get-Content (Join-Path $root 'OptionSchema.yml') -Raw | Should -BeExactly $before
     }
 
+    It 'builds a schema for a shim with no ConfigPaths from its overlay alone' {
+        # umu-launcher reads no config file, so there is nothing to parse and the
+        # overlay carries the whole schema.
+        $root = Join-Path $script:Temp ([guid]::NewGuid())
+        New-Item -ItemType Directory -Path $root -Force | Out-Null
+
+        Set-Content -Path (Join-Path $root 'redistributable.yml') -Encoding utf8 -Value @'
+Id: 1c8e4f2a-9d3b-4e56-8a71-2f0c6b5d3e97
+Name: TestShim
+Source:
+  Mode: none
+LastKnownVersion: "1.0.0"
+ConfigPaths: []
+'@
+
+        Set-Content -Path (Join-Path $root 'Schema.Overlay.yml') -Encoding utf8 -Value @'
+CommandTemplate: shim-run {exe} {args}
+GuestPlatforms: Windows
+Options:
+  GAMEID:
+    Type: string
+    Default: umu-default
+    IsEnvironmentVariable: true
+  PROTON_VERB:
+    Type: choice
+    Default: waitforexitandrun
+    Choices: [waitforexitandrun, run]
+    IsEnvironmentVariable: true
+'@
+
+        $first = Update-OptionSchemaFile -RepositoryPath $root
+        $first.IsUpToDate | Should -BeFalse
+        $first.Validation.IsValid | Should -BeTrue
+        $first.Report.Authored.Count | Should -Be 2
+
+        $written = Get-Content (Join-Path $root 'OptionSchema.yml') -Raw
+        $written | Should -Match 'CommandTemplate'
+        $written | Should -Match 'GAMEID'
+        $written | Should -Match 'PROTON_VERB'
+
+        (Update-OptionSchemaFile -RepositoryPath $root).IsUpToDate | Should -BeTrue
+    }
+
     It 'produces a readable markdown change report' {
         $root = New-TestRepository
         Update-OptionSchemaFile -RepositoryPath $root | Out-Null

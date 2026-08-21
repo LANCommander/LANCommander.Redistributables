@@ -13,7 +13,9 @@
     PascalCase and free of spaces, dots and dashes, because nested options are
     flattened into dot-notation keys and a dot inside a key would corrupt the path.
     IsEnvironmentVariable is meaningless on a list, since environment variables
-    are scalar; ProcessExecutionContext skips those with a warning.
+    are scalar; ProcessExecutionContext skips those with a warning. Two scalar
+    env-var options may not share a leaf key either, because the variable name is
+    the last dot-segment of the flattened path and one would silently win.
 
     Use Test-LcxPackage -Strict for the authoritative check -- it round-trips
     through the real YamlDotNet configuration the server uses.
@@ -85,6 +87,27 @@ function Test-OptionSchema {
     }
 
     Test-SchemaNode -Node $options -Prefix '' -Errors $errors -Warnings $warnings
+
+    # ProcessExecutionContext takes the environment variable name from the LAST
+    # dot-segment of the flattened key, so two env-var options sharing a leaf key
+    # in different groups quietly overwrite one another at launch.
+    $envNames = @{}
+
+    foreach ($entry in (ConvertTo-FlatSchema -Schema $Schema).GetEnumerator()) {
+        $definition = $entry.Value
+
+        if (-not ($definition.Contains('IsEnvironmentVariable') -and [bool] $definition['IsEnvironmentVariable'])) { continue }
+        if (([string] $definition['Type']).ToLowerInvariant() -eq 'list') { continue }
+
+        $name = ([string] $entry.Key -split '\.')[-1]
+
+        if ($envNames.ContainsKey($name)) {
+            $errors.Add("Options '$($envNames[$name])' and '$($entry.Key)' both resolve to environment variable '$name'; the launcher uses the last dot-segment of the key as the variable name, so one silently overwrites the other")
+        }
+        else {
+            $envNames[$name] = [string] $entry.Key
+        }
+    }
 
     return New-ValidationResult -Errors $errors -Warnings $warnings
 }
