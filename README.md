@@ -90,6 +90,14 @@ nothing ever conflicts. An option upstream adds that the overlay does not mentio
 still ships — it just ships uncurated, and the pull request lists it so someone
 can describe it.
 
+The overlay can also author an option outright, rather than only curating one the
+parser found: an entry that declares a `Type` becomes an option in its own right.
+That is what a compatibility shim configured through environment variables rather
+than a file needs — umu-launcher has no config to parse, so its `ConfigPaths` is
+empty and its entire schema is hand-written. An entry *without* a `Type` is still
+curation, and is still reported as stale when it matches nothing, so a mistyped
+path is caught rather than quietly becoming an option nobody asked for.
+
 `OptionSchema.yml` is treated like a lockfile: the build regenerates it and fails
 if the committed copy differs, so the schema in the repository always matches the
 schema in the published package.

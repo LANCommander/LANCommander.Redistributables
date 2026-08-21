@@ -34,10 +34,20 @@
 # Per-option curation, keyed by the generated dot-path. Anything set here wins
 # over what the parser inferred.
 #
+# An entry that declares a Type is authored outright rather than curated, so it
+# becomes an option even when nothing generated it. That is how a shim with no
+# config file to parse owns its whole schema -- see LANCommander.Redistributables
+# .UmuLauncher, which is configured purely through environment variables. An entry
+# without a Type is still curation and is still reported as stale when it matches
+# nothing, so a mistyped path is caught rather than silently becoming an option.
+#
 # Options:
 #   General.OutputAPI:
 #     DisplayName: Output API
 #     Description: Direct3D backend used to present frames.
+#   PROTONPATH:
+#     Type: string
+#     IsEnvironmentVariable: true
 #     Type: choice
 #     Choices: [best, fast, accurate]
 #   General.Adapter:

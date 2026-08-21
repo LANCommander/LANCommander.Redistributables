@@ -1,3 +1,6 @@
 [submodule "LANCommander.Redistributables.OpenALSoft"]
 	path = LANCommander.Redistributables.OpenALSoft
 	url = https://github.com/LANCommander/LANCommander.Redistributables.OpenALSoft.git
+[submodule "LANCommander.Redistributables.UmuLauncher"]
+	path = LANCommander.Redistributables.UmuLauncher
+	url = https://github.com/LANCommander/LANCommander.Redistributables.UmuLauncher.git
