@@ -449,3 +449,29 @@ Describe 'Resolve-UpstreamVersion' {
         { Resolve-UpstreamVersion -Resolver github-release -Url 'not a repo' } | Should -Throw '*owner/name*'
     }
 }
+
+Describe 'Test-RedistributableLicense - bundling prohibitions' {
+    BeforeAll {
+        $script:PolicyPath = Join-Path $PSScriptRoot '../policy/licenses.yml'
+    }
+
+    It 'blocks bundling when upstream forbids inclusion in launchers' {
+        # dgVoodoo2's real terms. Redistribution is allowed, but bundling into a
+        # launcher for use across multiple applications -- exactly what an .LCX in
+        # a redistributable library does -- is not.
+        $payload = Join-Path $script:Temp ([guid]::NewGuid())
+        New-Item -ItemType Directory -Path $payload -Force | Out-Null
+        Set-Content -Path (Join-Path $payload 'LICENSE') -Encoding utf8 -Value @'
+You can freely ship your game or game mod with individual dgVoodoo files included.
+If you want to host or re-distribute dgVoodoo as a standalone component for any
+reason then you must provide the full .zip package. You cannot bundle dgVoodoo
+inside launchers or frameworks, for general use across multiple applications.
+'@
+
+        $result = Test-RedistributableLicense -PayloadPath $payload -PolicyPath $script:PolicyPath
+
+        $result.License | Should -Be 'Proprietary-NoBundling'
+        $result.Redistribute | Should -Be 'no'
+        $result.RecommendedSourceMode | Should -Be 'none'
+    }
+}

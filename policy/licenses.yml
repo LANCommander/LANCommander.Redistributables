@@ -139,6 +139,28 @@ Licenses:
     Obligations:
       - The payload must not be bundled. Fetch it from the vendor at install time.
 
+  - Id: Proprietary-NoBundling
+    Name: Redistribution permitted, bundling into a launcher prohibited
+    Redistribute: no
+    # Ranked above the outright bans because it is narrower and more informative:
+    # these terms usually allow shipping the files alongside a single game while
+    # forbidding exactly what a redistributable library does.
+    Priority: 110
+    Signatures:
+      - 'cannot bundle'
+      - 'may not be bundled'
+      - 'must not be bundled'
+      - 'not be included in any launcher'
+      - 'inside launchers or frameworks'
+      - 'must provide the full .zip package'
+    Obligations:
+      - Do not bundle the payload. Fetch it from the vendor at install time, as a
+        complete package, into the individual game's directory.
+      - These terms typically permit shipping the files with one specific game
+        while forbidding general-purpose redistribution through a launcher, which
+        is precisely what bundling into an .LCX would be. Confirm the exact
+        wording before publishing anything.
+
   - Id: Freeware-PersonalUse
     Name: Freeware with use restrictions
     Redistribute: conditional
