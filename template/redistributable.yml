@@ -30,9 +30,16 @@ LastKnownVersion: "0.0.0"
 Source:
   # download  source.ps1 fetches the upstream release at build time.
   # vendored  the payload is committed under Files/.
-  # none      no payload is shipped; the Install script downloads on the client.
-  #           This is the mode to use when the upstream license does not permit
-  #           redistribution -- the SDK runs Install even with no archives.
+  # none      no payload is shipped; the files are fetched from the vendor after
+  #           import, by the Install script on the client or by the Package script
+  #           on the server. This is the mode to use when the upstream license does
+  #           not permit redistribution -- the SDK runs Install even with no
+  #           archives.
+  #
+  #           source.ps1 is still worth writing in this mode. It reports the
+  #           upstream version so the scheduled check still fires, and it populates
+  #           Reference/ (see ConfigPaths below). It is never allowed to yield a
+  #           payload here, so keep it to the config file and the license text.
   Mode: download
 
   # Consumed by source.ps1. github-release and html both have helpers in the
@@ -47,6 +54,13 @@ Source:
 # so an option added upstream appears automatically on the next scheduled run --
 # no script change required.
 #
+# With Source.Mode 'none' there is no payload to resolve against, so the config has
+# to be committed. The convention is Reference/, which the scheduled upstream check
+# refreshes from source.ps1 and includes in its pull request:
+#
+#   ConfigPaths:
+#     - Reference/upstream.conf
+#
 # Remove this section entirely for a plain runtime installer with no options.
 ConfigPaths: []
 
@@ -55,8 +69,11 @@ ConfigPaths: []
 # 'custom' requires a Parse-Config.ps1 in this repository.
 # ConfigFormat: ini
 
-# Optional. Harvests valid values out of the comment above each key, for configs
-# that document their options inline. Must expose a named group 'choices'.
+# Optional. Harvests valid values out of the comment directly above each key, for
+# configs that document their options inline. Must expose a named group 'choices'.
+#
+# A blank line ends a comment block, so this cannot read a config that documents a
+# whole section in one block above a blank line. Write a Parse-Config.ps1 for that.
 # ChoiceCommentPattern: '(?i)(?:values?|options?)\s*:\s*(?<choices>.+)'
 
 # Scripts ----------------------------------------------------------------------
