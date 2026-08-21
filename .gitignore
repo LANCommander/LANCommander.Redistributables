@@ -1,0 +1,19 @@
+# Build output
+*.lcx
+payload.zip
+/.build/
+/.hub/
+/.sdk/
+
+# Payload staging (resolved at build time, never committed in download mode)
+/**/.payload/
+
+# PowerShell / .NET
+bin/
+obj/
+*.nupkg
+
+# Editors
+.vs/
+.idea/
+*.user

@@ -1,0 +1,11 @@
+# Normalise to LF in the repository. Builds run on both Linux and Windows runners,
+# and OptionSchema.yml is compared byte-for-byte against a freshly generated copy,
+# so inconsistent line endings would make the schema look permanently stale.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.zip binary
+*.lcx binary
+*.dll binary
+*.exe binary

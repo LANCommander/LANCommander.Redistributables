@@ -1,0 +1,41 @@
+name: Build
+
+# Builds the .LCX and publishes it as a release.
+#
+# Triggered by pushes to main rather than by a tag. A push made with GITHUB_TOKEN
+# does not fire other workflows, so an auto-merged upstream-update pull request
+# would never build if this were tag-driven. The reusable workflow creates the tag
+# and the release itself.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'redistributable.yml'
+      - 'Schema.Overlay.yml'
+      - 'OptionSchema.yml'
+      - 'Scripts/**'
+      - 'Files/**'
+      - 'source.ps1'
+      - 'Parse-Config.ps1'
+  pull_request:
+    paths:
+      - 'redistributable.yml'
+      - 'Schema.Overlay.yml'
+      - 'OptionSchema.yml'
+      - 'Scripts/**'
+      - 'Files/**'
+      - 'source.ps1'
+      - 'Parse-Config.ps1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    uses: LANCommander/LANCommander.Redistributables/.github/workflows/build-lcx.yml@main
+    with:
+      # Validate on pull requests without publishing anything.
+      release: ${{ github.event_name != 'pull_request' }}
+    secrets: inherit

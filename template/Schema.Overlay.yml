@@ -1,0 +1,51 @@
+# Hand-written curation layered over the generated option schema.
+#
+# The generated half is disposable and rebuilt from the upstream config on every
+# run; this file is the durable half. Nothing here is ever overwritten by a
+# rebuild, so descriptions and choice lists survive upstream reshuffling. There is
+# no three-way merge and nothing to resolve.
+#
+# Options the upstream config gains that are not mentioned here still ship -- they
+# just ship uncurated, and the upstream-update pull request lists them so someone
+# can describe them later.
+#
+# Delete this file entirely for a redistributable with no configurable options.
+
+# Root schema properties. Only for compatibility shims -- tools that wrap game
+# execution. Omit all three for a plain runtime installer.
+#
+# CommandTemplate: umu-run {exe} {args}
+# GuestPlatforms: Windows
+# DisplayName: Proton
+
+# Regroup generated dot-paths under friendlier parents.
+#
+# Note that moving an option changes its dot-path, and per-game option values are
+# stored keyed by that path. Regrouping an option that servers have already
+# configured orphans those stored values, so settle the grouping early.
+#
+# Groups:
+#   Rendering:
+#     Description: Renderer configuration
+#     Include:
+#       - General.OutputAPI
+#       - DirectX.Antialiasing*
+
+# Per-option curation, keyed by the generated dot-path. Anything set here wins
+# over what the parser inferred.
+#
+# Options:
+#   General.OutputAPI:
+#     DisplayName: Output API
+#     Description: Direct3D backend used to present frames.
+#     Type: choice
+#     Choices: [best, fast, accurate]
+#   General.Adapter:
+#     PinDefault: true          # hold the committed default against upstream changes
+#   Proton.PROTONPATH:
+#     IsEnvironmentVariable: true
+
+# Drop options entirely. Glob-matched against the dot-path.
+#
+# Exclude:
+#   - Debug.*

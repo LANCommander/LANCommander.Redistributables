@@ -1,0 +1,28 @@
+name: Check Upstream
+
+# Watches the upstream project for a new version. When one appears, the option
+# schema is regenerated from the new config and a pull request is opened.
+# Merging that pull request publishes the release.
+
+on:
+  schedule:
+    # Offset from the hour so every redistributable in the org does not hit
+    # upstream at the same moment.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Rebuild the schema even when the version is unchanged'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check:
+    uses: LANCommander/LANCommander.Redistributables/.github/workflows/check-upstream.yml@main
+    with:
+      force: ${{ inputs.force == true }}
+    secrets: inherit

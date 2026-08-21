@@ -1,0 +1,153 @@
+# Redistribution policy for upstream redistributable payloads.
+#
+# Test-RedistributableLicense matches the license text found in an upstream
+# payload against these signatures and returns the resulting policy. The point is
+# to decide one thing: may we republish the upstream binaries as a GitHub release
+# asset inside an .LCX?
+#
+#   Redistribute: yes         Bundle the payload into the package.
+#   Redistribute: conditional Bundle only after a human confirms the terms.
+#   Redistribute: no          Do not bundle. The repository is switched to
+#                             Source.Mode: none and the Install script fetches
+#                             from the vendor on the client at install time.
+#
+# This is a routing aid for packaging decisions, not legal advice. 'conditional'
+# always stops for a human.
+#
+# Signatures are matched case-insensitively against the license text with runs of
+# whitespace collapsed, so they can be copied straight out of a license file.
+
+Default:
+  Redistribute: conditional
+  Reason: No recognised license text was found, so the terms need a human read.
+
+Licenses:
+  - Id: MIT
+    Name: MIT License
+    Redistribute: yes
+    Signatures:
+      - 'Permission is hereby granted, free of charge, to any person obtaining a copy'
+    Obligations:
+      - Include the copyright notice and the license text with the package.
+
+  - Id: BSD-3-Clause
+    Name: BSD 3-Clause License
+    Redistribute: yes
+    Signatures:
+      - 'Neither the name of the copyright holder nor the names of its contributors may be used to endorse'
+    Obligations:
+      - Reproduce the copyright notice, conditions and disclaimer in the distribution.
+      - Do not use the upstream project name to endorse this package.
+
+  - Id: BSD-2-Clause
+    Name: BSD 2-Clause License
+    Redistribute: yes
+    Signatures:
+      - 'Redistributions in binary form must reproduce the above copyright notice'
+    Obligations:
+      - Reproduce the copyright notice, conditions and disclaimer in the distribution.
+
+  - Id: Apache-2.0
+    Name: Apache License 2.0
+    Redistribute: yes
+    Signatures:
+      - 'Licensed under the Apache License, Version 2.0'
+      - 'Apache License Version 2.0, January 2004'
+    Obligations:
+      - Include the license and any NOTICE file from the upstream project.
+      - State any changes made to the upstream files.
+
+  - Id: Zlib
+    Name: zlib License
+    Redistribute: yes
+    Signatures:
+      - 'This software is provided ''as-is'', without any express or implied warranty'
+    Obligations:
+      - Do not misrepresent the origin of the software.
+      - Keep the license notice with the distribution.
+
+  - Id: ISC
+    Name: ISC License
+    Redistribute: yes
+    Signatures:
+      - 'Permission to use, copy, modify, and/or distribute this software for any purpose'
+    Obligations:
+      - Retain the copyright notice and permission notice.
+
+  - Id: Unlicense
+    Name: The Unlicense / public domain
+    Redistribute: yes
+    Signatures:
+      - 'This is free and unencumbered software released into the public domain'
+    Obligations: []
+
+  - Id: MPL-2.0
+    Name: Mozilla Public License 2.0
+    Redistribute: yes
+    Signatures:
+      - 'Mozilla Public License Version 2.0'
+    Obligations:
+      - Make the source of any modified MPL-covered files available.
+      - Include the license with the package.
+
+  - Id: LGPL
+    Name: GNU Lesser General Public License
+    Redistribute: yes
+    Signatures:
+      - 'GNU LESSER GENERAL PUBLIC LICENSE'
+    Obligations:
+      - Include the license text with the package.
+      - Record where the corresponding source can be obtained in NOTICE.md.
+      - Keep the library dynamically linked so it remains replaceable.
+
+  - Id: GPL
+    Name: GNU General Public License
+    Redistribute: yes
+    Signatures:
+      - 'GNU GENERAL PUBLIC LICENSE'
+    Obligations:
+      - Include the license text with the package.
+      - Provide the corresponding source, or a written offer for it, in NOTICE.md.
+      - Note that redistributing GPL binaries obliges us to offer source for the
+        exact build we ship, so prefer linking to the upstream release we packaged.
+
+  - Id: Microsoft-Redistributable
+    Name: Microsoft redistributable EULA
+    Redistribute: yes
+    Signatures:
+      - 'you may copy and distribute the object code form of the software'
+      - 'DISTRIBUTABLE CODE'
+      - 'REDISTRIBUTABLE COMPONENTS'
+    Obligations:
+      - Distribute the runtime unmodified and in its original installer form.
+      - Do not alter or remove any copyright, trademark or patent notices.
+
+  - Id: Proprietary-NoRedistribution
+    Name: Proprietary, redistribution prohibited
+    Redistribute: no
+    # Checked before the permissive signatures, because a permissive-looking
+    # warranty disclaimer often sits in the same file as a redistribution ban.
+    Priority: 100
+    Signatures:
+      - 'may not be redistributed'
+      - 'may not be distributed'
+      - 'shall not be redistributed'
+      - 'redistribution is prohibited'
+      - 'redistribution is not permitted'
+      - 'not be copied or distributed'
+      - 'no part of this software may be reproduced'
+    Obligations:
+      - The payload must not be bundled. Fetch it from the vendor at install time.
+
+  - Id: Freeware-PersonalUse
+    Name: Freeware with use restrictions
+    Redistribute: conditional
+    Priority: 90
+    Signatures:
+      - 'for personal use only'
+      - 'for non-commercial use only'
+      - 'commercial use is prohibited'
+      - 'free for personal'
+    Obligations:
+      - Confirm whether bundling inside a package distributed to LAN party guests
+        counts as permitted use before publishing the payload.

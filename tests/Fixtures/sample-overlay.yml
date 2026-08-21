@@ -1,0 +1,24 @@
+DisplayName: dgVoodoo2
+GuestPlatforms: Windows
+
+Groups:
+  Rendering:
+    Description: Renderer configuration
+    Include:
+      - General.OutputAPI
+      - General.Resolution
+      - DirectX.Antialiasing
+
+Options:
+  General.OutputAPI:
+    DisplayName: Output API
+    Description: Direct3D backend used to present frames.
+  DirectX.Antialiasing:
+    DisplayName: Antialiasing
+    Type: choice
+    Choices: [appdriven, 2x, 4x, 8x]
+  General.Adapter:
+    PinDefault: true
+
+Exclude:
+  - DirectX.DisableAndPassThru3Dfx

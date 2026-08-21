@@ -1,0 +1,151 @@
+name: Build LCX
+
+# Reusable build shared by every LANCommander.Redistributables.* repository.
+# A caller only needs:
+#
+#   jobs:
+#     build:
+#       uses: LANCommander/LANCommander.Redistributables/.github/workflows/build-lcx.yml@main
+#       secrets: inherit
+#
+# Fixes to packaging land here once and reach every redistributable.
+
+on:
+  workflow_call:
+    inputs:
+      hub_ref:
+        description: 'Ref of the hub repository to build with'
+        required: false
+        type: string
+        default: 'main'
+      release:
+        description: 'Publish a GitHub release. Off for pull request validation.'
+        required: false
+        type: boolean
+        default: true
+      strict:
+        description: 'Round-trip the package through the SDK model types'
+        required: false
+        type: boolean
+        default: true
+      dotnet_version:
+        description: 'Build .NET Version, used by the strict validation pass'
+        required: false
+        type: string
+        default: '10.0.x'
+      runs_on:
+        description: 'Runner label. Redistributables whose payload needs Windows tooling can override this.'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
+      retention_days:
+        description: 'Artifact retention. These are a hand-off for inspection; the release assets are the durable copy.'
+        required: false
+        type: number
+        default: 7
+    outputs:
+      version:
+        description: 'The raw upstream version that was built'
+        value: ${{ jobs.build.outputs.version }}
+      tag:
+        description: 'The sanitised git tag for that version'
+        value: ${{ jobs.build.outputs.tag }}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runs_on }}
+
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+      tag: ${{ steps.build.outputs.tag }}
+
+    steps:
+      - name: Checkout Redistributable
+        uses: actions/checkout@v4
+
+      # A reusable workflow does not bring its own repository contents with it,
+      # so the shared module has to be checked out explicitly.
+      - name: Checkout Hub
+        uses: actions/checkout@v4
+        with:
+          repository: LANCommander/LANCommander.Redistributables
+          ref: ${{ inputs.hub_ref }}
+          path: .hub
+
+      - name: Setup .NET
+        if: ${{ inputs.strict }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.dotnet_version }}
+
+      - name: Cache PowerShell Modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/powershell/Modules
+          key: psmodules-${{ runner.os }}-powershell-yaml
+
+      - name: Install Module Dependencies
+        shell: pwsh
+        run: |
+          if (-not (Get-Module -ListAvailable powershell-yaml)) {
+            Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+            Install-Module powershell-yaml -Scope CurrentUser -Force
+          }
+
+      - name: Build Package
+        id: build
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Import-Module ./.hub/module/LANCommander.Redistributables -Force
+
+          $result = Invoke-RedistributableBuild -RepositoryPath . -OutputDirectory ./.build -Strict:$${{ inputs.strict }}
+
+          "version=$($result.Version)" | Out-File $env:GITHUB_OUTPUT -Append
+          "tag=$($result.Tag)"         | Out-File $env:GITHUB_OUTPUT -Append
+          "name=$($result.Repository)" | Out-File $env:GITHUB_OUTPUT -Append
+
+          # Multi-line values need the delimiter form.
+          $delimiter = "EOF_CHANGELOG_$(New-Guid)"
+          "changelog<<$delimiter"        | Out-File $env:GITHUB_OUTPUT -Append
+          ($result.Changelog ?? '')      | Out-File $env:GITHUB_OUTPUT -Append
+          $delimiter                     | Out-File $env:GITHUB_OUTPUT -Append
+
+          Write-Host "::notice title=Built::$($result.Repository) $($result.Version)"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.name }}-${{ steps.build.outputs.tag }}
+          path: .build/*
+          retention-days: ${{ inputs.retention_days }}
+
+      # The release is cut here rather than by a tag-triggered workflow. A push
+      # made with GITHUB_TOKEN does not fire other workflows, so an auto-merged
+      # upstream-update PR would never produce a build if this were tag-driven.
+      - name: Publish Release
+        if: ${{ inputs.release && github.event_name != 'pull_request' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.build.outputs.tag }}
+          name: ${{ steps.build.outputs.tag }}
+          body: |
+            Automatically built LANCommander redistributable import package for
+            **${{ steps.build.outputs.name }}** at upstream version
+            **${{ steps.build.outputs.version }}**.
+
+            Import `redistributable.lcx` through the LANCommander server's
+            Redistributables page, or with:
+
+            ```
+            LANCommander.Launcher.CLI Import --Path redistributable.lcx --Type Redistributable
+            ```
+
+            ${{ steps.build.outputs.changelog }}
+          files: .build/*
+          fail_on_unmatched_files: true
+          make_latest: true

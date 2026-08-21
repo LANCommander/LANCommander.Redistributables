@@ -1,0 +1,76 @@
+# Identity ---------------------------------------------------------------------
+#
+# Id and every GUID under Scripts are generated ONCE when this repository is
+# scaffolded and must never change afterwards.
+#
+# RedistributableImporter matches an incoming record with
+#   r.Id == record.Id || r.Name == record.Name
+# so a regenerated GUID makes every published release import as a brand new
+# redistributable instead of updating the existing one. Servers would accumulate a
+# duplicate per release, each with its own per-game option values.
+
+Id: 00000000-0000-0000-0000-000000000000
+Name: REDIST_NAME
+
+Description: >
+  One or two sentences describing what this redistributable provides and which
+  games need it. Shown in the LANCommander admin UI.
+
+# Rendered in the admin UI. Carry the upstream attribution here so it travels
+# with the package.
+Notes: >
+  UPSTREAM_NAME is (c) UPSTREAM_AUTHOR and distributed under UPSTREAM_LICENSE.
+  See LICENSES/NOTICE.md.
+
+# Updated by the scheduled upstream check. Also the version used directly when
+# Source.Mode is vendored or none.
+LastKnownVersion: "0.0.0"
+
+# Payload ----------------------------------------------------------------------
+Source:
+  # download  source.ps1 fetches the upstream release at build time.
+  # vendored  the payload is committed under Files/.
+  # none      no payload is shipped; the Install script downloads on the client.
+  #           This is the mode to use when the upstream license does not permit
+  #           redistribution -- the SDK runs Install even with no archives.
+  Mode: download
+
+  # Consumed by source.ps1. github-release and html both have helpers in the
+  # shared module; see Resolve-UpstreamVersion.
+  Resolver: github-release
+  Url: https://github.com/OWNER/REPO
+
+# Configuration ----------------------------------------------------------------
+#
+# Config files parsed into OptionSchema.yml. Resolved against the downloaded
+# payload first, then against this repository. Every key found becomes an option,
+# so an option added upstream appears automatically on the next scheduled run --
+# no script change required.
+#
+# Remove this section entirely for a plain runtime installer with no options.
+ConfigPaths: []
+
+# Optional. Forces a parser instead of detecting one from the file extension.
+# One of: ini, keyvalue, json, yaml, xml, reg, custom.
+# 'custom' requires a Parse-Config.ps1 in this repository.
+# ConfigFormat: ini
+
+# Optional. Harvests valid values out of the comment above each key, for configs
+# that document their options inline. Must expose a named group 'choices'.
+# ChoiceCommentPattern: '(?i)(?:values?|options?)\s*:\s*(?<choices>.+)'
+
+# Scripts ----------------------------------------------------------------------
+#
+# Each entry maps a script type to the stable GUID for Scripts/<Type>.ps1.
+# Use the bare GUID form, or the mapping form to add manifest metadata:
+#
+#   Install:
+#     Id: <guid>
+#     Platforms: Windows        # omit to run on every platform
+#     Description: What it does
+#
+# RequiresAdmin is detected automatically from a leading
+# '#Requires -RunAsAdministrator' in the script.
+Scripts:
+  DetectInstall: 00000000-0000-0000-0000-000000000000
+  Install: 00000000-0000-0000-0000-000000000000

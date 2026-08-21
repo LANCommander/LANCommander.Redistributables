@@ -1,0 +1,155 @@
+name: Check Upstream
+
+# Reusable scheduled upstream check shared by every redistributable repository.
+#
+#   on:
+#     schedule:
+#       - cron: '17 6 * * *'
+#     workflow_dispatch:
+#
+#   jobs:
+#     check:
+#       uses: LANCommander/LANCommander.Redistributables/.github/workflows/check-upstream.yml@main
+#       secrets: inherit
+#
+# When upstream moves, this re-parses the config, rebuilds OptionSchema.yml through
+# the curation overlay, and opens a pull request. Merging it triggers build-lcx,
+# which cuts the release.
+
+on:
+  workflow_call:
+    inputs:
+      hub_ref:
+        required: false
+        type: string
+        default: 'main'
+      runs_on:
+        required: false
+        type: string
+        default: 'ubuntu-latest'
+      force:
+        description: 'Rebuild the schema even when the upstream version is unchanged'
+        required: false
+        type: boolean
+        default: false
+
+# create-pull-request also needs "Allow GitHub Actions to create and approve pull
+# requests" enabled for the org or repository. Without it the run fails at the
+# final step with a permissions error.
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check:
+    runs-on: ${{ inputs.runs_on }}
+
+    steps:
+      - name: Checkout Redistributable
+        uses: actions/checkout@v4
+
+      - name: Checkout Hub
+        uses: actions/checkout@v4
+        with:
+          repository: LANCommander/LANCommander.Redistributables
+          ref: ${{ inputs.hub_ref }}
+          path: .hub
+
+      - name: Install Module Dependencies
+        shell: pwsh
+        run: |
+          if (-not (Get-Module -ListAvailable powershell-yaml)) {
+            Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+            Install-Module powershell-yaml -Scope CurrentUser -Force
+          }
+
+      - name: Resolve Upstream Version
+        id: upstream
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Import-Module ./.hub/module/LANCommander.Redistributables -Force
+
+          $definition = Get-RedistributableDefinition -Path .
+          $known = [string] $definition['LastKnownVersion']
+          $payload = Resolve-RedistributablePayload -RepositoryPath . -CheckOnly
+
+          Write-Host "known=$known upstream=$($payload.Version)"
+
+          $changed = $payload.Version -ne $known
+
+          "version=$($payload.Version)" | Out-File $env:GITHUB_OUTPUT -Append
+          "previous=$known"             | Out-File $env:GITHUB_OUTPUT -Append
+          "changed=$($changed.ToString().ToLowerInvariant())" | Out-File $env:GITHUB_OUTPUT -Append
+
+          if (-not $changed) {
+            Write-Host "::notice title=Up to date::$($definition['Name']) is still at $known"
+          }
+
+      - name: Rebuild Option Schema
+        id: schema
+        if: ${{ steps.upstream.outputs.changed == 'true' || inputs.force }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Import-Module ./.hub/module/LANCommander.Redistributables -Force
+
+          $payload = Resolve-RedistributablePayload -RepositoryPath . -StagingPath ./.payload
+          $schema = Update-OptionSchemaFile -RepositoryPath . -PayloadPath $payload.PayloadPath
+
+          # LastKnownVersion is what the next run compares against, so it has to
+          # move in the same commit as the schema.
+          $definitionPath = './redistributable.yml'
+          $lines = Get-Content $definitionPath
+          $updated = $false
+
+          $lines = $lines | ForEach-Object {
+            if ($_ -match '^LastKnownVersion:') { $updated = $true; "LastKnownVersion: `"$($payload.Version)`"" } else { $_ }
+          }
+
+          if (-not $updated) { $lines += "LastKnownVersion: `"$($payload.Version)`"" }
+
+          Set-Content $definitionPath -Value $lines -Encoding utf8
+
+          $report = if ($schema.Report) { Export-OptionSchemaFile -Report $schema.Report -Version $payload.Version } else { 'No option schema is generated for this redistributable.' }
+
+          $delimiter = "EOF_REPORT_$(New-Guid)"
+          "report<<$delimiter" | Out-File $env:GITHUB_OUTPUT -Append
+          $report              | Out-File $env:GITHUB_OUTPUT -Append
+          $delimiter           | Out-File $env:GITHUB_OUTPUT -Append
+
+          if ($schema.Validation -and -not $schema.Validation.IsValid) {
+            foreach ($item in $schema.Validation.Errors) { Write-Host "::error::$item" }
+            throw 'The regenerated OptionSchema.yml is invalid'
+          }
+
+      - name: Clean Staging
+        if: always()
+        shell: pwsh
+        run: Remove-Item ./.payload -Recurse -Force -ErrorAction SilentlyContinue
+
+      - name: Open Pull Request
+        if: ${{ steps.upstream.outputs.changed == 'true' || inputs.force }}
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: upstream/${{ steps.upstream.outputs.version }}
+          delete-branch: true
+          commit-message: 'chore: update to upstream ${{ steps.upstream.outputs.version }}'
+          title: 'chore: update to upstream ${{ steps.upstream.outputs.version }}'
+          labels: upstream-update
+          add-paths: |
+            OptionSchema.yml
+            redistributable.yml
+            Files/**
+          body: |
+            Upstream moved from `${{ steps.upstream.outputs.previous }}` to
+            `${{ steps.upstream.outputs.version }}`.
+
+            `OptionSchema.yml` has been regenerated from the upstream config and
+            re-curated through `Schema.Overlay.yml`. Review the option changes
+            below, add descriptions for anything newly uncurated, then merge --
+            merging publishes the release.
+
+            ${{ steps.schema.outputs.report }}
