@@ -1,0 +1,3 @@
+[submodule "LANCommander.Redistributables.OpenALSoft"]
+	path = LANCommander.Redistributables.OpenALSoft
+	url = https://github.com/LANCommander/LANCommander.Redistributables.OpenALSoft.git
