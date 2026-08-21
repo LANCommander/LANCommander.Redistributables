@@ -4,3 +4,6 @@
 [submodule "LANCommander.Redistributables.UmuLauncher"]
 	path = LANCommander.Redistributables.UmuLauncher
 	url = https://github.com/LANCommander/LANCommander.Redistributables.UmuLauncher.git
+[submodule "LANCommander.Redistributables.dgVoodoo2"]
+	path = LANCommander.Redistributables.dgVoodoo2
+	url = https://github.com/LANCommander/LANCommander.Redistributables.dgVoodoo2.git
