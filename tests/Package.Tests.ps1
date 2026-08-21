@@ -427,6 +427,38 @@ However, redistribution is prohibited without written permission.
         $result.License | Should -Be 'Apache-2.0'
         $result.Obligations.Count | Should -BeGreaterThan 0
     }
+
+    It 'does not mistake GPL for LGPL because of the cross-reference in its closing notes' {
+        # GPLv3's "How to Apply These Terms" says to use the GNU Lesser General
+        # Public License instead for a library. Signatures are matched with
+        # whitespace collapsed, so that sentence -- wrapped across lines in the
+        # real file -- used to match a bare LGPL signature and classify every
+        # GPLv3 payload as LGPL.
+        $payload = New-LicensedPayload @'
+                    GNU GENERAL PUBLIC LICENSE
+                       Version 3, 29 June 2007
+
+  ...you may consider it more useful to permit linking proprietary
+applications with the library. If this is what you want to do, use the GNU
+Lesser General Public License instead of this License.
+'@
+        $result = Test-RedistributableLicense -PayloadPath $payload -PolicyPath $script:Policy
+
+        $result.License | Should -Be 'GPL'
+    }
+
+    It 'recognises the LGPL under both of its titles, over the ordinary GPL it references' {
+        # An LGPL text names the ordinary GPL throughout, so it must outrank it.
+        # Before v2.1 the LGPL was called the Library General Public License,
+        # which is what OpenAL Soft ships.
+        foreach ($title in @('GNU LESSER GENERAL PUBLIC LICENSE Version 2.1, February 1999',
+                             'GNU LIBRARY GENERAL PUBLIC LICENSE Version 2, June 1991')) {
+            $payload = New-LicensedPayload "$title`n`nThis license, the GNU General Public License, applies to..."
+            $result = Test-RedistributableLicense -PayloadPath $payload -PolicyPath $script:Policy
+
+            $result.License | Should -Be 'LGPL'
+        }
+    }
 }
 
 Describe 'Resolve-UpstreamVersion' {

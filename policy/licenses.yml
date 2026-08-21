@@ -90,11 +90,27 @@ Licenses:
       - Make the source of any modified MPL-covered files available.
       - Include the license with the package.
 
+  # The two GNU copyleft entries have to be told apart carefully, because each
+  # family's text names the other.
+  #
+  # Signatures are matched with whitespace collapsed, so a phrase wrapped across
+  # lines still matches. GPLv3's closing "How to Apply These Terms" says "use the
+  # GNU Lesser General Public License instead of this License", which a bare
+  # 'GNU LESSER GENERAL PUBLIC LICENSE' signature happily matched -- every GPLv3
+  # payload was classified LGPL. Anchoring on the title form fixes it: a title is
+  # immediately followed by its version, a cross-reference is not.
+  #
+  # LGPL must also outrank GPL, because an LGPL text references the ordinary GPL
+  # by name throughout and would otherwise match the looser entry first. Note the
+  # LGPL was called the Library General Public License before v2.1; that is what
+  # OpenAL Soft ships.
   - Id: LGPL
     Name: GNU Lesser General Public License
     Redistribute: yes
+    Priority: 20
     Signatures:
-      - 'GNU LESSER GENERAL PUBLIC LICENSE'
+      - 'GNU LESSER GENERAL PUBLIC LICENSE Version'
+      - 'GNU LIBRARY GENERAL PUBLIC LICENSE Version'
     Obligations:
       - Include the license text with the package.
       - Record where the corresponding source can be obtained in NOTICE.md.
@@ -103,6 +119,7 @@ Licenses:
   - Id: GPL
     Name: GNU General Public License
     Redistribute: yes
+    Priority: 10
     Signatures:
       - 'GNU GENERAL PUBLIC LICENSE'
     Obligations:
