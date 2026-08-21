@@ -74,7 +74,10 @@ $report
     }
 
     $tag = ConvertTo-VersionTag -Version $payload.Version
-    $repositoryName = "LANCommander.Redistributables.$name"
+
+    # RepositoryName, not Name -- the display name may contain spaces, which have
+    # no business in a release asset filename.
+    $repositoryName = "LANCommander.Redistributables.$($definition['RepositoryName'])"
     $lcxPath = Join-Path $OutputDirectory "$repositoryName-v$tag.lcx"
 
     Write-Host "==> Packing $lcxPath"

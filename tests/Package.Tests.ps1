@@ -475,3 +475,27 @@ inside launchers or frameworks, for general use across multiple applications.
         $result.RecommendedSourceMode | Should -Be 'none'
     }
 }
+
+Describe 'Get-RedistributableDefinition - repository name' {
+    It 'derives a filename-safe repository name from a display name with spaces' {
+        # "OpenAL Soft" is the display name; the release asset cannot carry a space.
+        $root = New-TestRepository
+        Set-Content -Path (Join-Path $root 'redistributable.yml') -Encoding utf8 -Value @'
+Id: 3f6d1c9e-8b2a-4d51-9c07-1e5a7b3f2d84
+Name: OpenAL Soft
+'@
+
+        (Get-RedistributableDefinition -Path $root).RepositoryName | Should -Be 'OpenALSoft'
+    }
+
+    It 'honours an explicit RepositoryName' {
+        $root = New-TestRepository
+        Set-Content -Path (Join-Path $root 'redistributable.yml') -Encoding utf8 -Value @'
+Id: 3f6d1c9e-8b2a-4d51-9c07-1e5a7b3f2d84
+Name: Visual C++ 2015-2022
+RepositoryName: VisualCpp
+'@
+
+        (Get-RedistributableDefinition -Path $root).RepositoryName | Should -Be 'VisualCpp'
+    }
+}

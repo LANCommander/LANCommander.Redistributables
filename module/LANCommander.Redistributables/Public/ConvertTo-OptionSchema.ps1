@@ -23,6 +23,10 @@
 .PARAMETER ChoiceCommentPattern
     Regex with a named 'choices' group, applied to the comment above each key to
     harvest valid values. Only meaningful for INI and key/value formats.
+.PARAMETER IncludeCommentedKeys
+    Treat commented-out `key = value` lines as options. Sample configs frequently
+    ship every option commented out at its default; without this such a file
+    parses to nothing.
 .PARAMETER CustomParserPath
     A redistributable-supplied Parse-Config.ps1 for formats nothing else handles.
     It receives -Content and -Source and must return parsed option records.
@@ -36,7 +40,8 @@ function ConvertTo-OptionSchema {
         [ValidateSet('auto', 'ini', 'keyvalue', 'json', 'yaml', 'xml', 'reg', 'custom')]
         [string] $Format = 'auto',
         [string] $ChoiceCommentPattern,
-        [string] $CustomParserPath
+        [string] $CustomParserPath,
+        [switch] $IncludeCommentedKeys
     )
 
     begin {
@@ -63,8 +68,8 @@ function ConvertTo-OptionSchema {
             Write-Verbose "Parsing $source as '$resolved'"
 
             $records = switch ($resolved) {
-                'ini'      { ConvertFrom-IniConfig -Content $content -ChoiceCommentPattern $ChoiceCommentPattern -Source $source }
-                'keyvalue' { ConvertFrom-IniConfig -Content $content -ChoiceCommentPattern $ChoiceCommentPattern -Source $source -NoSections }
+                'ini'      { ConvertFrom-IniConfig -Content $content -ChoiceCommentPattern $ChoiceCommentPattern -Source $source -IncludeCommentedKeys:$IncludeCommentedKeys }
+                'keyvalue' { ConvertFrom-IniConfig -Content $content -ChoiceCommentPattern $ChoiceCommentPattern -Source $source -NoSections -IncludeCommentedKeys:$IncludeCommentedKeys }
                 'json'     { ConvertFrom-StructuredConfig -Content $content -Format json -Source $source }
                 'yaml'     { ConvertFrom-StructuredConfig -Content $content -Format yaml -Source $source }
                 'xml'      { ConvertFrom-XmlConfig -Content $content -Source $source }

@@ -46,6 +46,13 @@ function Get-RedistributableDefinition {
         throw 'redistributable.yml Id must not be the empty GUID'
     }
 
+    # Name is a display name and may contain spaces ("OpenAL Soft"); the repository
+    # name cannot. Derive one when it is not stated explicitly, since it determines
+    # the release asset filenames.
+    if (-not $definition.Contains('RepositoryName') -or [string]::IsNullOrWhiteSpace([string] $definition['RepositoryName'])) {
+        $definition['RepositoryName'] = ([string] $definition['Name']) -replace '[^A-Za-z0-9._-]', ''
+    }
+
     # Normalise Source so callers never have to null-check it.
     $source = if ($definition.Contains('Source') -and $definition['Source']) { $definition['Source'] } else { [ordered] @{} }
 

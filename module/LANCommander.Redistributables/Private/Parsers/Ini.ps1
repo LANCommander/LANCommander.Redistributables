@@ -20,7 +20,8 @@ function ConvertFrom-IniConfig {
         [Parameter(Mandatory)][AllowEmptyString()][string] $Content,
         [string] $ChoiceCommentPattern,
         [string] $Source,
-        [switch] $NoSections
+        [switch] $NoSections,
+        [switch] $IncludeCommentedKeys
     )
 
     $results = [System.Collections.Generic.List[object]]::new()
@@ -38,7 +39,34 @@ function ConvertFrom-IniConfig {
         }
 
         if ($line.StartsWith(';') -or $line.StartsWith('#')) {
-            $commentBuffer.Add($line.TrimStart(';', '#').Trim())
+            $commented = $line.TrimStart(';', '#').Trim()
+
+            # Many projects ship a sample config with every option commented out at
+            # its default value -- OpenAL Soft's alsoftrc.sample is 88 of them. Those
+            # lines are the documented option set, so treating them as real keys is
+            # what makes such a file yield a schema at all. Gated because in a normal
+            # config a commented-out key means "deliberately not set".
+            if ($IncludeCommentedKeys -and $commented -match '^(?<key>[A-Za-z0-9_.\-]+)\s*=\s*(?<value>.*)$') {
+                $key = $Matches['key']
+                $value = $Matches['value'].Trim().Trim('"')
+
+                $comment = ($commentBuffer -join ' ').Trim()
+                $choices = Get-ChoiceFromComment -Comment $comment -Pattern $ChoiceCommentPattern
+
+                $segments = if ($section) {
+                    @((ConvertTo-OptionKey -Key $section), (ConvertTo-OptionKey -Key $key))
+                }
+                else {
+                    @(ConvertTo-OptionKey -Key $key)
+                }
+
+                $results.Add((New-ParsedOption -Segments $segments -Value $value -Choices $choices -Comment $comment -Source $Source))
+
+                $commentBuffer.Clear()
+                continue
+            }
+
+            $commentBuffer.Add($commented)
             continue
         }
 

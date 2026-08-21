@@ -229,3 +229,47 @@ Describe 'ConvertTo-OptionSchema - new upstream keys' {
         $second.Options['General']['Options'].Contains('B') | Should -BeTrue
     }
 }
+
+Describe 'ConvertTo-OptionSchema - commented-out sample configs' {
+    It 'finds nothing in a fully commented-out config by default' {
+        # In an ordinary config a commented-out key means "deliberately not set",
+        # so this has to stay opt-in.
+        $path = New-TempFile 'sample.ini' "[general]`n#channels =`n#frequency = 48000`n"
+        $schema = ConvertTo-OptionSchema -Path $path
+
+        $schema.Options.Count | Should -Be 0
+    }
+
+    It 'treats commented-out keys as options when asked' {
+        # OpenAL Soft's alsoftrc.sample is 88 of these; without this the file
+        # yields no schema at all.
+        $path = New-TempFile 'sample2.ini' "[general]`n#channels =`n#frequency = 48000`n"
+        $schema = ConvertTo-OptionSchema -Path $path -IncludeCommentedKeys
+
+        $schema.Options['General']['Options']['Frequency']['Default'] | Should -Be '48000'
+        $schema.Options['General']['Options'].Contains('Channels') | Should -BeTrue
+    }
+
+    It 'still attaches the prose above a commented-out key as its description' {
+        $path = New-TempFile 'sample3.ini' @'
+[general]
+## channels:
+#  Sets the output channel configuration. The available values are: mono, stereo.
+#channels = stereo
+'@
+        $schema = ConvertTo-OptionSchema -Path $path -IncludeCommentedKeys -ChoiceCommentPattern '(?i)values are:?\s*(?<choices>[^.]+)'
+        $option = $schema.Options['General']['Options']['Channels']
+
+        $option['Type'] | Should -Be 'choice'
+        $option['Choices'] | Should -Be @('mono', 'stereo')
+        $option['Description'] | Should -Match 'output channel configuration'
+    }
+
+    It 'does not mistake commented prose containing an equals sign for a key' {
+        $path = New-TempFile 'sample4.ini' "[general]`n# see docs, e.g. a = b is not a setting`n#real = 1`n"
+        $schema = ConvertTo-OptionSchema -Path $path -IncludeCommentedKeys
+
+        $schema.Options['General']['Options'].Count | Should -Be 1
+        $schema.Options['General']['Options'].Contains('Real') | Should -BeTrue
+    }
+}

@@ -79,9 +79,10 @@ function Update-OptionSchemaFile {
     $pattern = if ($definition.Contains('ChoiceCommentPattern')) { [string] $definition['ChoiceCommentPattern'] } else { $null }
     $format = if ($definition.Contains('ConfigFormat') -and $definition['ConfigFormat']) { [string] $definition['ConfigFormat'] } else { 'auto' }
     $customParser = Join-Path $RepositoryPath 'Parse-Config.ps1'
+    $includeCommented = $definition.Contains('IncludeCommentedKeys') -and [bool] $definition['IncludeCommentedKeys']
 
     $generated = if ($resolved.Count -gt 0) {
-        ConvertTo-OptionSchema -Path $resolved -Format $format -ChoiceCommentPattern $pattern -CustomParserPath $customParser
+        ConvertTo-OptionSchema -Path $resolved -Format $format -ChoiceCommentPattern $pattern -CustomParserPath $customParser -IncludeCommentedKeys:$includeCommented
     }
     else {
         [ordered] @{ Options = [ordered] @{} }
