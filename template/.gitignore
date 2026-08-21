@@ -1,0 +1,9 @@
+# Build output
+/dist/
+/.build/
+*.lcx
+payload.zip
+
+# Payload staging for download-mode redistributables. Never committed -- the
+# payload is resolved from upstream at build time.
+/.payload/

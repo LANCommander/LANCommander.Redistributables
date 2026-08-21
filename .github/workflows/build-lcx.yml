@@ -103,7 +103,7 @@ jobs:
         run: |
           Import-Module ./.hub/module/LANCommander.Redistributables -Force
 
-          $result = Invoke-RedistributableBuild -RepositoryPath . -OutputDirectory ./.build -Strict:$${{ inputs.strict }}
+          $result = Invoke-RedistributableBuild -RepositoryPath . -OutputDirectory ./dist -Strict:$${{ inputs.strict }}
 
           "version=$($result.Version)" | Out-File $env:GITHUB_OUTPUT -Append
           "tag=$($result.Tag)"         | Out-File $env:GITHUB_OUTPUT -Append
@@ -121,7 +121,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.build.outputs.name }}-${{ steps.build.outputs.tag }}
-          path: .build/*
+          # Not a dot-directory: actions/upload-artifact skips those by default.
+          path: dist/*
           retention-days: ${{ inputs.retention_days }}
 
       # The release is cut here rather than by a tag-triggered workflow. A push
@@ -146,6 +147,6 @@ jobs:
             ```
 
             ${{ steps.build.outputs.changelog }}
-          files: .build/*
+          files: dist/*
           fail_on_unmatched_files: true
           make_latest: true
