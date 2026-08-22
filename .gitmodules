@@ -7,3 +7,6 @@
 [submodule "LANCommander.Redistributables.dgVoodoo2"]
 	path = LANCommander.Redistributables.dgVoodoo2
 	url = https://github.com/LANCommander/LANCommander.Redistributables.dgVoodoo2.git
+[submodule "LANCommander.Redistributables.DOSBox-X"]
+	path = LANCommander.Redistributables.DOSBox-X
+	url = https://github.com/LANCommander/LANCommander.Redistributables.DOSBox-X.git
