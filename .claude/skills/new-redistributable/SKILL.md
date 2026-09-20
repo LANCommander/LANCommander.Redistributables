@@ -89,6 +89,11 @@ what we authored; `NOTICE.md` is what makes that boundary explicit.
 Copy `template/` to `D:\Repositories\LANCommander.Redistributables\LANCommander.Redistributables.<Name>`
 and replace every `REDIST_*` and `UPSTREAM_*` placeholder.
 
+For a Visual C++ runtime, copy `template-vcredist/` instead and follow its
+`TEMPLATE.md`. It is a working package with the version-specific values lifted out,
+so it already carries the registry detection, exit-code handling and architecture
+option described under [Runtime installers](#runtime-installers).
+
 Generate the stable GUIDs — one for the redistributable, one per script:
 
 ```powershell
@@ -225,16 +230,77 @@ gh run watch --repo LANCommander/LANCommander.Redistributables.<Name>
 gh release view --repo LANCommander/LANCommander.Redistributables.<Name>
 ```
 
-Download the published `redistributable.lcx` and validate the artefact that
-actually shipped, not just the one you built locally:
+Download the published `.lcx` and validate the artefact that actually shipped, not
+just the one you built locally. The release carries a single versioned asset named
+`LANCommander.Redistributables.<Name>-v<tag>.lcx` -- there is no fixed-name copy, so
+let `gh` resolve it:
 
 ```powershell
-Test-LcxPackage -Path ./redistributable.lcx -Strict
+gh release download --repo LANCommander/LANCommander.Redistributables.<Name> --pattern '*.lcx' --dir ./tmp-release
+Test-LcxPackage -Path (Get-ChildItem ./tmp-release/*.lcx).FullName -Strict
 ```
 
 Report to the user: the repository URL, the release, the resolved upstream version,
 which scripts shipped, how many options the schema exposes, the licence verdict and
 whether the payload is bundled or fetched on the client.
+
+## Runtime installers
+
+A runtime installer — DirectX, Visual C++, .NET, PhysX — behaves differently enough
+from a shim that the defaults elsewhere in this skill need adjusting. What follows
+was established building `LANCommander.Redistributables.VisualCppV14`.
+
+**Detect on version, not presence.** These installers refuse to downgrade: run one
+over a newer build and it returns an error rather than doing nothing. So
+`DetectInstall` has to answer "is a runtime at least this new installed", which
+means comparing against `$RedistributableManifest.Version` — injected for
+`DetectInstall`, `Install` and `Uninstall` alike, see
+`ScriptClient.Redistributables.cs`.
+
+Normalise before comparing. Vendors write their own format into the registry:
+Microsoft stores `v14.51.36247.00` while the manifest carries the installer's file
+version `14.51.36247.0`. Those are the same build, but `[version]'14.51.36247'` has
+Revision `-1`, which sorts *below* `.0` — compare them raw and detection never
+succeeds. Reduce both sides to major.minor.build.
+
+**Probe both registry views.** A 32-bit component's key lives under
+`WOW6432Node`, a 64-bit component's under the native path, and which one your
+PowerShell can see depends on its own bitness. For the Visual C++ v14 runtime on a
+64-bit host, `...\VC\Runtimes\x64` exists natively while `...\x86` exists *only*
+under `WOW6432Node`. Check both roots for every architecture.
+
+**Treat "already newer" and "reboot pending" as success.** For a Microsoft
+installer that is `1638` (sometimes surfacing as the HRESULT `0x80070666`), `3010`
+and `1641`, alongside `0`. Returning any of those as a failure makes an already
+satisfied machine look broken to the operator.
+
+**`Uninstall` is a no-op returning 0.** A system runtime is shared with software
+LANCommander did not install and cannot enumerate. Removing it because one game was
+uninstalled breaks the rest. Say so in the script, or someone will "fix" it.
+
+**No `CommandTemplate` and no `GuestPlatforms`.** Those belong to shims that wrap a
+launch command. A runtime installer has neither.
+
+**It may still have options** — the skill says to delete `Schema.Overlay.yml` for a
+plain runtime installer, and that holds when there is genuinely nothing to choose.
+But an option that is *ours* rather than upstream's is legitimate: which
+architecture to install is the obvious one. There is no config file to parse, so
+author it from the overlay, exactly as `UmuLauncher` does. `both` is the right
+default for architecture — 64-bit Windows needs the 32-bit runtime too, because
+most older games are 32-bit.
+
+**Detecting architecture from the game.** Read the PE machine field of the primary
+action's executable: `0x8664` x64, `0xAA64` ARM64, `0x014C` x86. There is a worked
+copy in `LANCommander.Redistributables.OpenALSoft/Scripts/Install.ps1`. Fall back to
+installing everything when the executable cannot be read, and note that a .NET
+AnyCPU executable reports `0x014C` even though it runs 64-bit.
+
+**Versions with no version.** Microsoft publishes no version number or release feed
+for the v14 redistributable; their documented answer is to read **File version** off
+the downloaded installer. `[System.Diagnostics.FileVersionInfo]::GetVersionInfo()`
+parses the PE resource directly rather than asking the OS, so it works on the Linux
+build runner too. If a vendor ever needs Windows tooling to resolve a version, both
+caller workflows take a `runs_on` input.
 
 ## Things that will bite you
 

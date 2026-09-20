@@ -10,3 +10,6 @@
 [submodule "LANCommander.Redistributables.DOSBox-X"]
 	path = LANCommander.Redistributables.DOSBox-X
 	url = https://github.com/LANCommander/LANCommander.Redistributables.DOSBox-X.git
+[submodule "LANCommander.Redistributables.VisualCppV14"]
+	path = LANCommander.Redistributables.VisualCppV14
+	url = https://github.com/LANCommander/LANCommander.Redistributables.VisualCppV14.git
