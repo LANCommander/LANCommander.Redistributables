@@ -6,3 +6,10 @@
 # Payload staging for download-mode redistributables. Never committed -- the
 # payload is resolved from upstream at build time.
 /.payload/
+
+# Scratch directories the build and verification steps create in-tree.
+# TEMPLATE.md and the new-redistributable skill both write payloads here, and an
+# unignored tmp-payload is a bundled upstream installer one "git add -A" away from
+# being committed.
+/tmp-payload/
+/tmp-release/

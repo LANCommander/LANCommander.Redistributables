@@ -84,6 +84,21 @@ Note which architectures appear under the native path and which only under
 both. For v14 on a 64-bit host, `x64` exists natively but `x86` exists *only* under
 `WOW6432Node`.
 
+Do not generalise v14's layout to the older versions. On a 64-bit host **2012 and
+2013 register both architectures under `WOW6432Node` and leave the native path
+absent entirely** — verified on a machine carrying both. Probing only the native
+root, which looks like the obvious thing to do from v14's shape, would silently
+never detect them. An empty native key is normal for these versions, not a fault,
+and it is worth saying so in the README so nobody goes looking for a bug.
+
+**ARM64 in the PE-header mapping.** `DetectInstall` and `Install` both map a
+`0xAA64` ARM64 executable to the x64 runtime. The comment explaining why is
+v14-specific: v14's x64 package genuinely contains ARM64 binaries. No older version
+does, and Microsoft never shipped an ARM64 build of them at all — for those, x64 is
+simply the closest thing that exists and ARM64 Windows runs it emulated. The
+behaviour is right either way; copy it, but rewrite the reason or the comment
+becomes a false statement about Microsoft's packaging.
+
 **Install switches.** v14 and the 2012/2013 packages take
 `/install /quiet /norestart`. The 2010 and earlier packages predate that syntax
 and take `/q /norestart`. Running the wrong one gives you a visible installer UI
@@ -134,6 +149,16 @@ names `vcredist_x86.exe` and `vcredist_x64.exe` outright as distributable,
 unmodified, with your program. Record both in `NOTICE.md` rather than picking the
 convenient one. Check whether the version you are packaging has an equivalent
 REDIST list -- 2012, 2010, 2008 and 2005 each have their own.
+
+2012 has been checked and follows the same pattern: `EULAID:VS2012_RTM_VC.1_ENU`,
+extracted from `license.rtf` at `u4` exactly as 2013 is, with no Distributable
+Code section, against a REDIST list at
+<https://learn.microsoft.com/en-us/visualstudio/releases/2012/2012-redistribution-vs>
+that names the same three installers. Read each REDIST list rather than assuming it
+matches its neighbour -- the 2012 Visual C++ section omits 2013's "with your
+program" qualifier, which makes it marginally *stronger* for our purposes, and the
+Express editions carry a narrower list that does not cover the `.exe` installers at
+all. Both of those belong in `NOTICE.md`.
 
 **Filenames and the license interact.** Where a REDIST list grants the installers
 *by name*, keep those names rather than normalising them. `VisualCppV12` does
