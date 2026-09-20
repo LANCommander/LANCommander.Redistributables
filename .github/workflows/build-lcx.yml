@@ -139,11 +139,11 @@ jobs:
             **${{ steps.build.outputs.name }}** at upstream version
             **${{ steps.build.outputs.version }}**.
 
-            Import `redistributable.lcx` through the LANCommander server's
-            Redistributables page, or with:
+            Import `${{ steps.build.outputs.name }}-${{ steps.build.outputs.tag }}.lcx`
+            through the LANCommander server's Redistributables page, or with:
 
             ```
-            LANCommander.Launcher.CLI Import --Path redistributable.lcx --Type Redistributable
+            LANCommander.Launcher.CLI Import --Path ${{ steps.build.outputs.name }}-${{ steps.build.outputs.tag }}.lcx --Type Redistributable
             ```
 
             ${{ steps.build.outputs.changelog }}

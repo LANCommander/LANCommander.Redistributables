@@ -32,11 +32,11 @@ Merging it publishes a new release.
 
 ## Using a redistributable
 
-Download `redistributable.lcx` from any redistributable's latest release and
-import it through your server's **Redistributables** page, or:
+Download the `.lcx` asset from any redistributable's latest release and import it
+through your server's **Redistributables** page, or:
 
 ```
-LANCommander.Launcher.CLI Import --Path redistributable.lcx --Type Redistributable
+LANCommander.Launcher.CLI Import --Path LANCommander.Redistributables.<Name>-v<version>.lcx --Type Redistributable
 ```
 
 Because the identifiers in each package are stable across releases, re-importing a

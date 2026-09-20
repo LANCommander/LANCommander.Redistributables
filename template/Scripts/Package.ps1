@@ -2,7 +2,11 @@
 # package once keeps itself updated from this repository's releases, with no
 # further imports.
 #
-# Return an object with Path (a DIRECTORY to be archived), Version and Changelog.
+# Hand the result back with New-Package -Path <a DIRECTORY to be archived>
+# -Version <string> [-Changelog <string>]. Path and Version are mandatory, and the
+# server runs this in a runspace with no host, so a bare New-Package cannot prompt
+# for them -- it fails to bind, and the operator sees only "the package script did
+# not return a result".
 # Returning nothing means "no new package required", which is the normal result.
 #
 # Available: $Redistributable (the SDK model, including its current Version) and
@@ -22,20 +26,46 @@ if ($version -eq $Redistributable.Version) {
     return
 }
 
-$asset = $release.assets | Where-Object { $_.name -eq 'payload.zip' } | Select-Object -First 1
+$asset = $release.assets | Where-Object { $_.name -like '*.lcx' } | Select-Object -First 1
 
 if (-not $asset) {
-    throw "Release $($release.tag_name) has no payload.zip asset"
+    throw "Release $($release.tag_name) has no .lcx asset"
 }
 
-$staging = New-Item -ItemType Directory -Force -Path (Join-Path $env:TEMP "REDIST_NAME-$version")
-$archive = Join-Path $env:TEMP "REDIST_NAME-$version.zip"
+# GetTempPath rather than $env:TEMP, which only exists on Windows -- this script
+# runs on the server, which may be either.
+$temp = [System.IO.Path]::GetTempPath()
 
-Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $archive
-Expand-Archive -Path $archive -DestinationPath $staging -Force
-Remove-Item $archive -Force
+$staging = New-Item -ItemType Directory -Force -Path (Join-Path $temp "REDIST_NAME-$version")
+$package = Join-Path $temp "REDIST_NAME-$version.lcx"
+$payload = Join-Path $temp "REDIST_NAME-$version-payload.zip"
 
-$Return = New-Package
-$Return.Path = $staging.FullName
-$Return.Version = $version
-$Return.Changelog = $release.body
+Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $package
+
+# Windows PowerShell does not load the compression assembly on its own.
+if ($PSVersionTable.PSEdition -eq 'Desktop') {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+}
+
+# An .lcx is a ZIP whose payload is a single inner ZIP under Archives/, already
+# laid out relative to the payload root. Pull that out rather than shipping a
+# second copy of the same bytes as a separate release asset.
+$lcx = [System.IO.Compression.ZipFile]::OpenRead($package)
+
+try {
+    $entry = $lcx.Entries | Where-Object { $_.FullName -like 'Archives/*' } | Select-Object -First 1
+
+    # A script-only redistributable carries no archive, so there is nothing to
+    # repackage even though the version moved.
+    if (-not $entry) { return }
+
+    [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $payload, $true)
+}
+finally {
+    $lcx.Dispose()
+}
+
+Expand-Archive -Path $payload -DestinationPath $staging -Force
+Remove-Item $package, $payload -Force
+
+$Return = New-Package -Path $staging.FullName -Version $version -Changelog $release.body

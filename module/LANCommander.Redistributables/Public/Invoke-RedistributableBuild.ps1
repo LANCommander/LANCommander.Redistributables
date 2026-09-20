@@ -14,7 +14,7 @@
 .PARAMETER RepositoryPath
     Root of the redistributable repository.
 .PARAMETER OutputDirectory
-    Where to write the .lcx and payload.zip.
+    Where to write the .lcx.
 .PARAMETER UpdateSchema
     Rewrite OptionSchema.yml rather than failing when it is stale.
 .PARAMETER Strict
@@ -98,23 +98,6 @@ $report
     }
 
     $assets = @($package.Path)
-
-    # A fixed-name copy so consumers can use /releases/latest/download/redistributable.lcx
-    # without knowing the version.
-    $stable = Join-Path $OutputDirectory 'redistributable.lcx'
-    Copy-Item -LiteralPath $package.Path -Destination $stable -Force
-    $assets += $stable
-
-    # A plain payload zip, which is what a server-side Package script consumes --
-    # it returns a directory of files, not an .lcx.
-    if ($payload.PayloadPath) {
-        $payloadZip = Join-Path $OutputDirectory 'payload.zip'
-
-        if (Test-Path -LiteralPath $payloadZip) { Remove-Item -LiteralPath $payloadZip -Force }
-
-        Compress-Archive -Path (Join-Path $payload.PayloadPath '*') -DestinationPath $payloadZip -CompressionLevel Optimal
-        $assets += $payloadZip
-    }
 
     Write-Host "==> Built $repositoryName v$($payload.Version)"
 

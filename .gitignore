@@ -1,6 +1,6 @@
 # Build output
 *.lcx
-payload.zip
+/dist/
 /.build/
 /.hub/
 /.sdk/

@@ -7,11 +7,11 @@ REDIST_DESCRIPTION
 
 ## Install it
 
-Download `redistributable.lcx` from the [latest release][latest] and import it
+Download the `.lcx` asset from the [latest release][latest] and import it
 through your LANCommander server's **Redistributables** page, or from the CLI:
 
 ```
-LANCommander.Launcher.CLI Import --Path redistributable.lcx --Type Redistributable
+LANCommander.Launcher.CLI Import --Path LANCommander.Redistributables.REDIST_NAME-v<version>.lcx --Type Redistributable
 ```
 
 Then assign it to the games that need it, either from the game's
