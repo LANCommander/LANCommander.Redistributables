@@ -285,15 +285,18 @@ launch command. A runtime installer has neither.
 plain runtime installer, and that holds when there is genuinely nothing to choose.
 But an option that is *ours* rather than upstream's is legitimate: which
 architecture to install is the obvious one. There is no config file to parse, so
-author it from the overlay, exactly as `UmuLauncher` does. `both` is the right
-default for architecture — 64-bit Windows needs the 32-bit runtime too, because
-most older games are 32-bit.
+author it from the overlay, exactly as `UmuLauncher` does. `auto` is the default
+across the Visual C++ family: install only the runtime the game's PE header calls
+for. `both` is the safe fallback an administrator should reach for when unsure —
+64-bit Windows needs the 32-bit runtime too, because most older games are 32-bit.
 
 **Detecting architecture from the game.** Read the PE machine field of the primary
 action's executable: `0x8664` x64, `0xAA64` ARM64, `0x014C` x86. There is a worked
 copy in `LANCommander.Redistributables.OpenALSoft/Scripts/Install.ps1`. Fall back to
 installing everything when the executable cannot be read, and note that a .NET
-AnyCPU executable reports `0x014C` even though it runs 64-bit.
+AnyCPU executable reports `0x014C` even though it runs 64-bit. Under an `auto`
+default that caveat is load-bearing rather than a footnote — say so in the option
+description and point at `both` as the fix.
 
 **Versions with no version.** Microsoft publishes no version number or release feed
 for the v14 redistributable; their documented answer is to read **File version** off

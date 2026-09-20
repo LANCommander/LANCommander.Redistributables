@@ -5,8 +5,10 @@ Automatically built LANCommander redistributable import package (`.LCX`) for the
 
 REDIST_DESCRIPTION
 
-Both architectures are bundled. 64-bit Windows needs the x86 runtime too, because
-most games of this era are 32-bit — see [Options](#options).
+Both architectures are bundled. By default each client installs only the one the
+game's executable actually needs; set the `Architecture` option to **Both** for
+.NET AnyCPU games, which report as 32-bit but run 64-bit — see
+[Options](#options).
 
 > **Read [`LICENSES/NOTICE.md`](LICENSES/NOTICE.md) before relying on this
 > package.** Microsoft's terms for the standalone redistributable do not grant
@@ -47,7 +49,7 @@ versions straight from this repository's releases.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `Architecture` | choice — `both`, `auto`, `x86`, `x64` | `both` | Which runtime to install. Leave this at **Both** unless you have a reason not to: 64-bit Windows needs the x86 runtime as well, because most games of this era are 32-bit, and a 64-bit machine with only the x64 runtime still fails to launch them. **Match the game executable** reads the executable's PE header and installs only the runtime it needs — but note that a .NET AnyCPU executable reports as 32-bit there even though it runs 64-bit, so set those to **Both**. |
+| `Architecture` | choice — `both`, `auto`, `x86`, `x64` | `auto` | Which runtime to install. The default, **Match the game executable**, reads the game's PE header and installs only the runtime it actually needs. There is one case it gets wrong: a .NET AnyCPU executable reports as 32-bit even though it runs 64-bit, so set those games to **Both**. **Both** is also the right answer whenever you are unsure — 64-bit Windows still needs the x86 runtime because most games of this era are 32-bit, and installing both is never wrong, only occasionally more than necessary. |
 
 Administrators can override this per game from the game's **Redistributables**
 page. Values resolve as schema default, then per-game value, then per-action

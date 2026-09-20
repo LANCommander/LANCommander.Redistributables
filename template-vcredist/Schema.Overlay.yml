@@ -12,20 +12,23 @@
 # Default is quoted. OptionDefinition.Default is typed object and
 # GetDefaultAsString() calls ToString(), so an unquoted scalar reaches the install
 # scripts as whatever .NET stringifies it to.
+#
+# Keep this option identical across the Visual C++ family. An administrator who
+# learns it once should not have to relearn it per version.
 
 Options:
   Architecture:
     Type: choice
     DisplayName: Architecture
     Description: >
-      Which runtime to install. Leave this at Both unless you have a reason not to:
-      64-bit Windows needs the x86 runtime as well, because most games of this era
-      are 32-bit, and a 64-bit machine with only the x64 runtime still fails to
-      launch them. Match the game executable reads the executable's PE header and
-      installs only the runtime it needs, which suits a curated library where the
-      saving is worth the assumption -- but note that a .NET AnyCPU executable
-      reports as 32-bit there even though it runs 64-bit, so set those to Both.
-    Default: 'both'
+      Which runtime to install. The default, Match the game executable, reads the
+      game's PE header and installs only the runtime it actually needs. There is
+      one case it gets wrong: a .NET AnyCPU executable reports as 32-bit even
+      though it runs 64-bit, so set those games to Both. Both is also the right
+      answer whenever you are unsure -- 64-bit Windows still needs the x86 runtime
+      because most games of this era are 32-bit, and installing both is never
+      wrong, only occasionally more than necessary.
+    Default: 'auto'
     Choices:
       - { Value: 'both', DisplayName: 'Both (x86 and x64)' }
       - { Value: 'auto', DisplayName: 'Match the game executable' }

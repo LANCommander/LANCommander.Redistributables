@@ -4,6 +4,10 @@ This scaffold is not a guess. It is `LANCommander.Redistributables.VisualCppV14`
 with the version-specific values lifted out, so everything here has been built,
 strict-validated and run against a real registry at least once.
 
+`LANCommander.Redistributables.VisualCppV12` (2013) was derived from it and is the
+worked example for everything below -- including the two places where following
+this file blindly would have been wrong.
+
 Delete this file from the repository you create — it documents the scaffold, not
 the package.
 
@@ -96,11 +100,46 @@ are pinned to a fixed build and will never move; their check runs daily and alwa
 reports no change. That is correct, not broken — leave the workflow in place rather
 than deleting it, in case Microsoft reissues a security update.
 
+**The download links themselves.** Check what an `aka.ms` short link actually
+serves before trusting it. `https://aka.ms/highdpimfc2013x86` looks like the 2013
+x86 link and is not one -- it redirects to Bing's unknown-short-link page, which
+answers `200`. The real link is `https://aka.ms/highdpimfc2013x86enu`, with the
+locale suffix. A wrong link here does not fail loudly; `source.ps1` downloads an
+HTML page under a `.exe` name and the build dies much later on an unreadable PE
+version.
+
 **The license.** Fetch the terms for the version you are packaging rather than
-copying `UPSTREAM-LICENSE.txt` from a sibling. Microsoft revises these. For v14 the
-document is a `.docx` behind <https://aka.ms/VCRedistLicense>; extract its text
-rather than saving the rendered web page, which is JavaScript-only and contains no
-license text at all.
+copying `UPSTREAM-LICENSE.txt` from a sibling. Microsoft revises these, and the
+differences are not cosmetic.
+
+For v14 the document is a `.docx` behind <https://aka.ms/VCRedistLicense>; extract
+its text rather than saving the rendered web page, which is JavaScript-only and
+contains no license text at all.
+
+For 2013 there is no published URL at all -- the EULA
+(`EULAID: VS2013_RTM_VC.1_ENU`) ships only inside the bundle. Pull it out of the
+installer:
+
+```powershell
+7z x vcredist_x64.exe -oux        # the UX container
+# the Burn manifest, file "0", maps payload ids to source paths;
+# look for FilePath="license.rtf" and take its SourcePath (u4 for 2013)
+```
+
+Expect the two to disagree. The 2013 standalone EULA has **no Distributable Code
+section** and forbids publishing the software for others to copy, while the
+Visual Studio 2013 REDIST list
+(<https://learn.microsoft.com/en-us/visualstudio/releases/2013/2013-redistribution-vs>)
+names `vcredist_x86.exe` and `vcredist_x64.exe` outright as distributable,
+unmodified, with your program. Record both in `NOTICE.md` rather than picking the
+convenient one. Check whether the version you are packaging has an equivalent
+REDIST list -- 2012, 2010, 2008 and 2005 each have their own.
+
+**Filenames and the license interact.** Where a REDIST list grants the installers
+*by name*, keep those names rather than normalising them. `VisualCppV12` does
+exactly that: it ships `vcredist_x86.exe` / `vcredist_x64.exe` and adjusts
+`source.ps1`, `Install.ps1` and `Package.ps1` to match, accepting the divergence
+from the rest of the family as the smaller cost.
 
 ## 5. Build and validate
 
