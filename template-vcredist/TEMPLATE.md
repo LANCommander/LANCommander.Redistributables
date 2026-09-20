@@ -67,8 +67,22 @@ to work and silently never installs anything.
 | 2015–2022 (v14) | `Microsoft\VisualStudio\14.0\VC\Runtimes\{x86,x64}` |
 | 2013 | `Microsoft\VisualStudio\12.0\VC\Runtimes\{x86,x64}` |
 | 2012 | `Microsoft\VisualStudio\11.0\VC\Runtimes\{x86,x64}` |
-| 2010 | `Microsoft\VisualStudio\10.0\VC\VCRedist\{x86,x64}` |
+| 2010 | `Microsoft\VisualStudio\10.0\VC\VCRedist\{x86,x64}` — note `VCRedist`, not `Runtimes` |
 | 2008 and 2005 | no such key — detect through the uninstall registry or the WinSxS assembly instead |
+
+The **value names** are stable further back than the key path is. 2010 carries the
+same `Installed` DWORD and `Version` REG_SZ (`v10.0.40219.325`) the later versions
+do, so `DetectInstall` needed nothing but the path swapped — verified while building
+`VisualCppV10`. Do not trust the widely cited guidance here: the standard answer for
+detecting 2010 (Aaron Stebner's MSDN post, and everything downstream of it)
+describes an `Installed` DWORD plus `Major`/`Minor`/`Bld`/`Rbld` DWORDs and never
+mentions `Version` at all. That is incomplete for the SP1 MFC Security Update build,
+and following it would have you write version-composition arithmetic you do not
+need. Read the key before believing any of it, including this table.
+
+2010 does rename two of the DWORDs — `MajorVersion` and `MinorVersion`, where 11.0,
+12.0 and 14.0 use `Major` and `Minor`. Nothing in the scripts reads them, so it
+changes no code, but do not assume symmetry when deriving 2008 or 2005.
 
 Confirm on a machine that has the runtime installed:
 
@@ -84,12 +98,13 @@ Note which architectures appear under the native path and which only under
 both. For v14 on a 64-bit host, `x64` exists natively but `x86` exists *only* under
 `WOW6432Node`.
 
-Do not generalise v14's layout to the older versions. On a 64-bit host **2012 and
-2013 register both architectures under `WOW6432Node` and leave the native path
-absent entirely** — verified on a machine carrying both. Probing only the native
+Do not generalise v14's layout to the older versions. On a 64-bit host **2010, 2012
+and 2013 register both architectures under `WOW6432Node` and leave the native path
+absent entirely** — verified on a machine carrying all three. Probing only the native
 root, which looks like the obvious thing to do from v14's shape, would silently
 never detect them. An empty native key is normal for these versions, not a fault,
-and it is worth saying so in the README so nobody goes looking for a bug.
+and it is worth saying so in the README so nobody goes looking for a bug. v14 is the
+exception, not the rule.
 
 **ARM64 in the PE-header mapping.** `DetectInstall` and `Install` both map a
 `0xAA64` ARM64 executable to the x64 runtime. The comment explaining why is
@@ -99,10 +114,22 @@ simply the closest thing that exists and ARM64 Windows runs it emulated. The
 behaviour is right either way; copy it, but rewrite the reason or the comment
 becomes a false statement about Microsoft's packaging.
 
-**Install switches.** v14 and the 2012/2013 packages take
-`/install /quiet /norestart`. The 2010 and earlier packages predate that syntax
-and take `/q /norestart`. Running the wrong one gives you a visible installer UI
-during a silent install, or a usage dialog that never returns.
+**Install switches.** v14 and the 2012/2013 packages are Burn bundles and take
+`/install /quiet /norestart`. The 2010 and earlier packages predate Burn — 2010 is a
+Visual Studio setup-engine bootstrapper wrapping `vc_red.msi` — and take
+`/q /norestart`. Running the wrong one gives you a visible installer UI during a
+silent install, or a usage dialog that never returns.
+
+You can check this without installing anything. The pre-Burn bootstrapper's switch
+table is a wide-string list inside the `SetupEngine.dll` it carries; for 2010 it
+reads `CEIPconsent chainingpackage createlayout lcid log msioptions norestart
+passive showfinalerror pipe promptrestart q repair serialdownload uninstall
+parameterfolder NoSetupVersionCheck uninstallpatch quiet nosplashscreen ? h help`:
+
+```powershell
+7z x vcredist_x86.exe -otmp-eula
+python -c "import re;d=open('tmp-eula/SetupEngine.dll','rb').read().decode('utf-16-le','ignore');print([m for m in re.findall(r'(?i)[a-z? ]{40,}', d) if 'norestart' in m.lower()])"
+```
 
 **Side-by-side behaviour.** 2013 and earlier install alongside each other and
 alongside v14 — a machine can legitimately carry five of these at once. That is
@@ -147,8 +174,26 @@ Visual Studio 2013 REDIST list
 (<https://learn.microsoft.com/en-us/visualstudio/releases/2013/2013-redistribution-vs>)
 names `vcredist_x86.exe` and `vcredist_x64.exe` outright as distributable,
 unmodified, with your program. Record both in `NOTICE.md` rather than picking the
-convenient one. Check whether the version you are packaging has an equivalent
-REDIST list -- 2012, 2010, 2008 and 2005 each have their own.
+convenient one.
+
+**The public REDIST lists stop at 2012.** This was wrong here until `VisualCppV10`
+was built, and it matters because it is the one thing that changes the shape of
+`NOTICE.md` rather than just its values. `learn.microsoft.com` hosts
+`/visualstudio/releases/<year>/<year>-redistribution-vs` for 2012 and 2013 and
+nothing earlier -- every plausible slug for 2010 is a 404, under `/2010/` and under
+its neighbours. Visual Studio 2010's documentation says why: the list is `Redist.txt`
+in `..\Microsoft Visual Studio 10.0\` on a machine with VS 2010 installed, and the
+terms are `Eula.txt` on the installation media
+(<https://learn.microsoft.com/en-us/previous-versions/visualstudio/visual-studio-2010/ms235299(v=vs.100)>).
+Neither is citable by URL.
+
+So for 2010 and earlier you cannot open `NOTICE.md`'s grant section with a block
+quote the way V11 and V12 do. Do not paper over that by quoting a list from memory or
+by reusing a sibling's quotation with the year changed. `VisualCppV10` handles it by
+saying outright that the evidence is thinner, citing what *is* public (the general
+"licensed Visual Studio users" condition, and the 2010 docs naming
+`VCRedist_x86.exe` as the intended deployment vehicle), and leaving the tension
+visible. Expect 2008 and 2005 to be at least as thin.
 
 2012 has been checked and follows the same pattern: `EULAID:VS2012_RTM_VC.1_ENU`,
 extracted from `license.rtf` at `u4` exactly as 2013 is, with no Distributable
@@ -160,11 +205,38 @@ program" qualifier, which makes it marginally *stronger* for our purposes, and t
 Express editions carry a narrower list that does not cover the `.exe` installers at
 all. Both of those belong in `NOTICE.md`.
 
+2010 has been checked too, and the extraction is *easier* than 2012/2013 because it
+predates Burn. There is no UX container and no manifest indirection -- `7z x` on the
+installer gives you the setup-engine layout directly, with one localised EULA per
+LCID folder:
+
+```powershell
+7z x vcredist_x86.exe -otmp-eula     # -> Setup.exe, SetupEngine.dll, vc_red.msi,
+                                     #    vc_red.cab, msp_kb2565063.msp, 1033/, ...
+# the English terms are tmp-eula/1033/eula.rtf
+```
+
+It is an `.rtf`, so convert rather than copying the markup -- a
+`System.Windows.Forms.RichTextBox` round-trip renders it the way V11 and V12 store
+theirs, including resolving the `HYPERLINK` field in the export-restrictions clause
+down to its display text. Titled *MICROSOFT VISUAL C++ 2010 RUNTIME LIBRARIES WITH
+SERVICE PACK 1*, byte-identical across the x86 and x64 packages, no Distributable
+Code section, and the same *Scope of License* ban on "publish the software for others
+to copy". It carries **no EULAID**, unlike 2012 and 2013 -- its title is the only
+identifier it has, so do not invent one for the `NOTICE.md` table.
+
 **Filenames and the license interact.** Where a REDIST list grants the installers
 *by name*, keep those names rather than normalising them. `VisualCppV12` does
 exactly that: it ships `vcredist_x86.exe` / `vcredist_x64.exe` and adjusts
 `source.ps1`, `Install.ps1` and `Package.ps1` to match, accepting the divergence
 from the rest of the family as the smaller cost.
+
+Where there is no list to match -- 2010 and earlier -- keep the upstream names
+anyway. The positive argument is gone, but renaming a file you are relying on a
+redistribution grant to carry is a change with no upside, and it keeps the payload
+layout consistent with V11 and V12. Since the template ships v14's
+`vc_redist.<arch>.exe` spelling, deriving a pre-2017 version is easiest by copying
+those four script files from `VisualCppV11` rather than from here.
 
 ## 5. Build and validate
 
