@@ -22,3 +22,6 @@
 [submodule "LANCommander.Redistributables.VisualCppV10"]
 	path = LANCommander.Redistributables.VisualCppV10
 	url = https://github.com/LANCommander/LANCommander.Redistributables.VisualCppV10.git
+[submodule "LANCommander.Redistributables.VisualCppV9"]
+	path = LANCommander.Redistributables.VisualCppV9
+	url = https://github.com/LANCommander/LANCommander.Redistributables.VisualCppV9.git

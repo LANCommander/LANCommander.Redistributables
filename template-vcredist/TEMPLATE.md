@@ -41,7 +41,7 @@ later makes each release import as a duplicate rather than an update.
 | `REDIST_REPOSITORY` | `RepositoryName`, used for release asset filenames | `VisualCppV14` |
 | `REDIST_DESCRIPTION` | One or two sentences. Name the DLLs that go missing — that is what people search for | `MSVCP140.dll`, `VCRUNTIME140.dll` |
 | `UPSTREAM_DOWNLOAD_X86` / `_X64` | Download links from the Microsoft page | `https://aka.ms/vc14/vc_redist.x86.exe` |
-| `UPSTREAM_VERSION` | `LastKnownVersion`, four-part file version of the x64 installer | `14.51.36247.0` |
+| `UPSTREAM_VERSION` | `LastKnownVersion`, the four-part version of the x64 package. Read from the installer's PE resource for 2010 and later; for 2008 the shell's PE version is stale and it comes from the MSI instead — see below | `14.51.36247.0` |
 | `UPSTREAM_RUNTIMES_SUBKEY` | Registry subkey under `HKLM\SOFTWARE`, **without** the architecture leaf | `Microsoft\VisualStudio\14.0\VC\Runtimes` |
 | `UPSTREAM_INSTALL_ARGS` | PowerShell array literal of silent-install switches | `'/install', '/quiet', '/norestart'` |
 | `UPSTREAM_INSTALL_ARGS_DISPLAY` | The same switches as prose, for the README | `/install /quiet /norestart` |
@@ -68,7 +68,8 @@ to work and silently never installs anything.
 | 2013 | `Microsoft\VisualStudio\12.0\VC\Runtimes\{x86,x64}` |
 | 2012 | `Microsoft\VisualStudio\11.0\VC\Runtimes\{x86,x64}` |
 | 2010 | `Microsoft\VisualStudio\10.0\VC\VCRedist\{x86,x64}` — note `VCRedist`, not `Runtimes` |
-| 2008 and 2005 | no such key — detect through the uninstall registry or the WinSxS assembly instead |
+| 2008 | **nothing.** `...\VisualStudio\9.0\VC` is absent from both registry views — confirmed while building `VisualCppV9` on a machine carrying 9.0.30729.6161 for both architectures. Detect through the uninstall registry; see below |
+| 2005 | expect the same as 2008, but check |
 
 The **value names** are stable further back than the key path is. 2010 carries the
 same `Installed` DWORD and `Version` REG_SZ (`v10.0.40219.325`) the later versions
@@ -82,7 +83,50 @@ need. Read the key before believing any of it, including this table.
 
 2010 does rename two of the DWORDs — `MajorVersion` and `MinorVersion`, where 11.0,
 12.0 and 14.0 use `Major` and `Minor`. Nothing in the scripts reads them, so it
-changes no code, but do not assume symmetry when deriving 2008 or 2005.
+changes no code, but do not assume symmetry when deriving 2005.
+
+**Detecting a version with no key at all: what 2008 needed.** `VisualCppV9` is the
+worked example, and this is the only part of `DetectInstall.ps1` that cannot be
+produced by swapping a path. Microsoft's documented answer for 9.0 — a fixed list of
+MSI product codes passed to `MsiQueryProductState` — is unusable: the codes differ
+per servicing build *and* per installer locale, as the comments on Aaron Stebner's
+own article record. The uninstall registry is what works, read under both
+`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall` and its `WOW6432Node`
+counterpart, matching entries named
+`Microsoft Visual C++ 2008 Redistributable - {x86|x64} <version>`.
+
+Three things make that harder than it looks, all verified:
+
+- **The display name is authoritative for the version, not `DisplayVersion`.** The
+  latter derives from MSI `ProductVersion`, which Windows Installer truncates to
+  three fields — the SP1 entry reads `9.0.30729` where its name reads
+  `9.0.30729.17`. Read the name and keep `DisplayVersion` as the fallback, not the
+  other way round.
+- **Several entries per architecture is the normal state.** 2010 and later
+  major-upgrade; 2008 does not. RTM, SP1, the ATL update and the MFC update each
+  keep their own uninstall entry, so take the newest per architecture rather than
+  the first match. The test machine carried three x86 entries at once.
+- **The architecture is in the display name**, which is what makes the match
+  survive registry redirection — the x64 entries land natively and the x86 ones
+  under `WOW6432Node`.
+
+The WinSxS assembly probe this file used to offer as the alternative was considered
+and rejected. `microsoft.vc90.crt` and its siblings are stamped per assembly, and
+those stamps are not guaranteed to equal the package version the manifest carries,
+so it risks reporting "older" forever. Matching on a display name has one weakness —
+a localised installer writing a translated one — and the failure mode is benign:
+nothing matches, detection reports "not installed", and `Install` puts the machine
+right anyway.
+
+**Comparing versions: three components is not always enough.** Every repository
+before `VisualCppV9` reduces both sides to major.minor.build. 2008 cannot afford
+that, because its entire servicing history lives in the revision field — SP1 is
+`9.0.30729.17`, the ATL update `.4148`, the MFC update `.6161`. Collapsed to three,
+an unpatched SP1 machine reports as satisfied and never receives MS11-025. `V9`
+parses a fourth optional group and reads a missing component as `0`, which keeps the
+original reason for normalising intact (a three-part `[version]` has `Revision` -1,
+sorting below `.0`). Check where a version's servicing actually happens before
+copying either helper.
 
 Confirm on a machine that has the runtime installed:
 
@@ -116,9 +160,11 @@ becomes a false statement about Microsoft's packaging.
 
 **Install switches.** v14 and the 2012/2013 packages are Burn bundles and take
 `/install /quiet /norestart`. The 2010 and earlier packages predate Burn — 2010 is a
-Visual Studio setup-engine bootstrapper wrapping `vc_red.msi` — and take
-`/q /norestart`. Running the wrong one gives you a visible installer UI during a
-silent install, or a usage dialog that never returns.
+Visual Studio setup-engine bootstrapper wrapping `vc_red.msi`, 2008 a plainer
+self-extracting shell around the same file — and take `/q /norestart`. Confirmed for
+2008 while building `VisualCppV9`; Microsoft's own guidance for it is "you only need
+to use `/q`". Running the wrong one gives you a visible installer UI during a silent
+install, or a usage dialog that never returns.
 
 You can check this without installing anything. The pre-Burn bootstrapper's switch
 table is a wide-string list inside the `SetupEngine.dll` it carries; for 2010 it
@@ -130,6 +176,39 @@ parameterfolder NoSetupVersionCheck uninstallpatch quiet nosplashscreen ? h help
 7z x vcredist_x86.exe -otmp-eula
 python -c "import re;d=open('tmp-eula/SetupEngine.dll','rb').read().decode('utf-16-le','ignore');print([m for m in re.findall(r'(?i)[a-z? ]{40,}', d) if 'norestart' in m.lower()])"
 ```
+
+**Where the version actually lives.** Every repository up to `VisualCppV10` reads
+the version from the PE resource of the downloaded installer, and `source.ps1` is
+otherwise identical across all of them. **Do not assume that still holds.** For 2008
+it does not: `vcredist_x86.exe` and `vcredist_x64.exe` are stamped `9.0.30729.5677`,
+the file version of the self-extracting shell, which Microsoft left behind at the
+ATL Security Update and never restamped. The package inside is `9.0.30729.6161` —
+what the MSI declares, what a client records in its uninstall entry, what Microsoft's
+winget manifests carry, and what the Download Center entry serves.
+
+Nothing fails loudly if you take the shell's number. You get a package stamped with
+a build that appears in no other source, and a `DetectInstall` comparing against a
+version no machine will ever report. Cross-check the PE version against the
+installed product's version before trusting it.
+
+`VisualCppV9` resolves it from `vc_red.msi` instead, unpacked with the vendor's own
+`/x:` switch — no 7-Zip, no third-party tooling, nothing installed. Three traps in
+that route, all hit while building it:
+
+- **`/x:` returns exit code 0 when it has extracted nothing.** A path containing a
+  space silently produces no files unless the switch value is quoted
+  (`'/x:"{0}"' -f $path`). Test for `vc_red.msi`, not for the exit code.
+- **Hand COM a `[string]`, not what `Join-Path` returned.** `Join-Path` emits a
+  `PSObject`-wrapped string, and marshalling that wrapper into
+  `WindowsInstaller.Installer` fails with `DISP_E_TYPEMISMATCH` — an error that
+  names nothing useful and sends you looking at the MSI. Cast it.
+- **Do not test a COM object with `-not`.** It has no boolean conversion, so `-not`
+  dispatches into the object and comes back with the same `DISP_E_TYPEMISMATCH`.
+  Compare against `$null`.
+
+This is a second, independent reason to pin `runs_on: windows-latest` — extraction
+runs a Windows executable and the property read goes through COM — so say which
+reason applies in the workflow comment rather than inheriting a sibling's.
 
 **Side-by-side behaviour.** 2013 and earlier install alongside each other and
 alongside v14 — a machine can legitimately carry five of these at once. That is
@@ -193,7 +272,27 @@ by reusing a sibling's quotation with the year changed. `VisualCppV10` handles i
 saying outright that the evidence is thinner, citing what *is* public (the general
 "licensed Visual Studio users" condition, and the 2010 docs naming
 `VCRedist_x86.exe` as the intended deployment vehicle), and leaving the tension
-visible. Expect 2008 and 2005 to be at least as thin.
+visible.
+
+2008 has been checked and is thinner still, in a way worth knowing before you go
+looking. `/visualstudio/releases/2008/2008-redistribution-vs` is a 404 like 2010's,
+and the Visual C++ 2008 deployment page that tells you where the list lives instead
+— <https://learn.microsoft.com/en-us/previous-versions/visualstudio/visual-studio-2008/ms235299(v=vs.90)>
+— **cites the wrong year**, pointing at "the Microsoft Software License Terms for
+Visual Studio 2005" and at `Program Files\Microsoft Visual Studio 2005`, apparently
+carried over from its 2005 predecessor and never corrected. That is not a
+transcription slip to tidy up when you quote it; it is the state of the only public
+signpost to the 2008 grant, and `VisualCppV9`'s `NOTICE.md` says so outright. Expect
+2005 to be no better.
+
+Extraction for 2008 is the easiest of the family, easier even than 2010's. It
+predates Burn as 2010 does, but its EULAs are **plain UTF-16 text rather than RTF** —
+one file per LCID at the root, English at `eula.1033.txt`, so no `RichTextBox`
+round-trip is needed. Titled *MICROSOFT VISUAL C++ 2008 RUNTIME LIBRARIES (X86, IA64
+AND X64), SERVICE PACK 1*, byte-identical across both packages, no Distributable Code
+section, the same *Scope of License* ban on "publish the software for others to
+copy", and — like 2010, unlike 2012 and 2013 — **no EULAID**. The installer's own
+`/x:<dir> /q` gets you there without 7-Zip.
 
 2012 has been checked and follows the same pattern: `EULAID:VS2012_RTM_VC.1_ENU`,
 extracted from `license.rtf` at `u4` exactly as 2013 is, with no Distributable
@@ -237,6 +336,13 @@ redistribution grant to carry is a change with no upside, and it keeps the paylo
 layout consistent with V11 and V12. Since the template ships v14's
 `vc_redist.<arch>.exe` spelling, deriving a pre-2017 version is easiest by copying
 those four script files from `VisualCppV11` rather than from here.
+
+For **2005**, take `DetectInstall.ps1` from `VisualCppV9` and the other three from
+`VisualCppV11`. V11's detection reads a registry key that 2005, like 2008, does not
+write; V9's already carries the uninstall-registry scan and the four-part version
+comparison, and should need little beyond the year in its display-name pattern —
+after you have confirmed what 2005 actually writes there, which is the whole point
+of this section.
 
 ## 5. Build and validate
 
